@@ -2489,30 +2489,32 @@ public class BaseProcLua : CBaseProc
     }
 
     // RVA: 0x15E35E4  Ghidra: work/06_ghidra/decompiled_full/BaseProcLua/SendAppsFlyerMessage.c
-    // PORTED 1-1:
+    // PORTED 1-1 (original body — kept as comment for restoration):
     //   UJDebug.Log("SendAppsFlyerMessage:"[9892] + mode);
     //   if (keys != null && Values != null && keys.Length == Values.Length) {
     //     dict = new Dictionary<string, object>();
     //     for i: dict.Add(keys[i], Values[i]);
     //     AppsFlyerSDK.AppsFlyer.sendEvent(mode, dict);
-    //   } else if mismatch length: just return (Ghidra: early return when lengths differ).
+    //   } else if mismatch length: just return.
+    //
+    // TEMP STUB: AppsFlyerSDK is analytics-only (no game-logic side effect).
+    // Its static cctor throws "TypeInitializationException" in this build because the
+    // native AppsFlyer plugin isn't loaded — and the exception propagates up through
+    // Lua, killing OnCreatePlayerResult (the next-screen flow) before it reaches
+    // SGCNetSenderLobby:GetPlayerShowData / CheckNeedCreateChar / PrepareLoginMap.
+    // We early-return here to keep the analytics call a no-op until AppsFlyerSDK is
+    // properly imported (out of scope this slice). All callers (BaseProcLua only)
+    // are fire-and-forget — no return value to fake.
     public static void SendAppsFlyerMessage(string mode, string[] keys, string[] Values)
     {
-        UJDebug.Log("SendAppsFlyerMessage:" + mode);
-        if (keys == null || Values == null)
-        {
-            throw new NullReferenceException();
-        }
-        if (keys.Length != Values.Length)
-        {
-            return;
-        }
-        Dictionary<string, string> dict = new Dictionary<string, string>();
-        for (int i = 0; i < keys.Length; i++)
-        {
-            dict.Add(keys[i], Values[i]);
-        }
-        AppsFlyerSDK.AppsFlyer.sendEvent(mode, dict);
+        UJDebug.Log("SendAppsFlyerMessage (STUB, AppsFlyerSDK not imported):" + mode);
+        return;
+        // Original body below — restore when AppsFlyerSDK plugin lands:
+        // if (keys == null || Values == null) throw new NullReferenceException();
+        // if (keys.Length != Values.Length) return;
+        // Dictionary<string, string> dict = new Dictionary<string, string>();
+        // for (int i = 0; i < keys.Length; i++) dict.Add(keys[i], Values[i]);
+        // AppsFlyerSDK.AppsFlyer.sendEvent(mode, dict);
     }
 
     // RVA: 0x15E37A4  Ghidra: work/06_ghidra/decompiled_full/BaseProcLua/PointIsOverUI.c
