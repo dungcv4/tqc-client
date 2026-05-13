@@ -40,16 +40,11 @@ public static class LuaBinder
 		// HAND-WRITTEN wrap for UnityEngine.RectTransform — exposes anchoredPosition / rect.width etc.
 		// Required because ProcessBase.lua V_Update touches clickEff.transform.anchoredPosition every UI click.
 		UnityEngine_RectTransformWrap.Register(L);
-		// HAND-WRITTEN wrap for UnityEngine.AsyncOperation — exposes isDone / progress / allowSceneActivation.
-		// Required because Manager/SceneMgr.lua reads state.asynLoadOp.isDone on the return value of
-		// SceneManager.LoadSceneAsync. Without this wrap tolua throws "field or property isDone does not
-		// exist" and scene load never advances past 0% progress.
-		UnityEngine_AsyncOperationWrap.Register(L);
-		// HAND-WRITTEN wrap for UnityEngine.AudioSource — exposes volume / isPlaying + Play/Stop/Pause.
-		// Required because Manager/SceneMgr.lua:414 does typeof(UnityEngine.AudioSource) +
-		// PostProcessSceneObjects reads .volume on collected sources. Without the wrap, typeof returns
-		// nil and tolua throws "attempt to call typeof on type nil" right after scene loads.
-		UnityEngine_AudioSourceWrap.Register(L);
+		// NOTE: UnityEngine_AsyncOperationWrap + UnityEngine_AudioSourceWrap moved INTO the
+		// BeginModule("UnityEngine")…EndModule() block below (around UnityEngine_TrailRendererWrap)
+		// so that `typeof(UnityEngine.AudioSource)` in Lua resolves correctly. BeginClass(t) uses
+		// `t.Name` ("AudioSource") combined with the current module path; registering at the root
+		// module makes the type accessible as global `AudioSource` instead of `UnityEngine.AudioSource`.
 		IconTextureMgrWrap.Register(L);
 		ImageViewerWrap.Register(L);
 		InfiniteVerticalScrollWrap.Register(L);
@@ -172,6 +167,19 @@ public static class LuaBinder
 		UnityEngine_TrailRendererWrap.Register(L);
 		UnityEngine_TransformWrap.Register(L);
 		UnityEngine_WrapModeWrap.Register(L);
+		// HAND-WRITTEN wrap for UnityEngine.AsyncOperation — exposes isDone / progress / allowSceneActivation.
+		// Required because Manager/SceneMgr.lua reads state.asynLoadOp.isDone on the return value of
+		// SceneManager.LoadSceneAsync. Without this wrap tolua throws "field or property isDone does not
+		// exist" and scene load never advances past 0% progress.
+		// Lives INSIDE the UnityEngine module so the type registers as `UnityEngine.AsyncOperation`.
+		UnityEngine_AsyncOperationWrap.Register(L);
+		// HAND-WRITTEN wrap for UnityEngine.AudioSource — exposes volume / isPlaying + Play/Stop/Pause.
+		// Required because Manager/SceneMgr.lua:414 does `typeof(UnityEngine.AudioSource)`.
+		// MUST live INSIDE the UnityEngine module — otherwise tolua registers the class as bare
+		// `AudioSource` at the root, so `UnityEngine.AudioSource` resolves to nil in Lua and
+		// PostProcessSceneObjects fires `attempt to call typeof on type nil` every frame during
+		// scene-load polling.
+		UnityEngine_AudioSourceWrap.Register(L);
 		// HAND-WRITTEN wrap (Spine.Unity.SpineSkin breaks broader regen).
 		// Lua WndForm_MsgWindow:54+ uses UnityEngine.TextAnchor.IntToEnum(...) for Text.alignment.
 		UnityEngine_TextAnchorWrap.Register(L);
