@@ -1,0 +1,25 @@
+public enum limits
+{
+	INT_MAX = int.MaxValue,
+	gameMax_RAY_DISTANCE = 20000,
+	game_icon_size = 64,
+	jobID_WARLORD = 1,
+	jobID_LEADER = 2,
+	jobID_ADVISOR = 3,
+	jobID_WIZARD = 4,
+	jobID_ASSASSIN = 5,
+	jobID_ENGINEER = 6,
+	jobID_MONK = 7,
+	ACCOUNT_SIZE = 24,
+	PASSWORD_SIZE = 24,
+	serverSUB_SET_MAX = 10,
+	gameMAX_IMODE_VIEW_NUMBER = 10,
+	gameMAX_SEC_PASSWORD_LENGTH = 20,
+	gameMAX_CARRYITEM_ITEMMODE = 40,
+	gameMAX_STORAGEITEM_ITEMMODE = 32,
+	gameCWAR_KS_STAGE_BEGIN = 3700,
+	gameCWAR_KS_STAGE_END = 3999,
+	gameMAX_SKILL_LEVEL = 10,
+	gameMAX_SKILL_LEVEL_EXTRA = 50,
+	gameMAX_PARTY_PLAYER = 5
+}

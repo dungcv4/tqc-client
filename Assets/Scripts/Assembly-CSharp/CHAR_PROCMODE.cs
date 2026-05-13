@@ -1,0 +1,13 @@
+public enum CHAR_PROCMODE
+{
+	MOVETO = 20,
+	DEAD = 30,
+	ATTACK = 40,
+	MAGIC = 45,
+	HURT = 50,
+	AUTOATTACK = 60,
+	AUTOMAGIC = 70,
+	SHOW = 80,
+	WAIT = 81,
+	CAST_WAIT = 100
+}

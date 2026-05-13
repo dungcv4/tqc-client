@@ -1,0 +1,23 @@
+public enum ID_COUNTRY
+{
+	NULL = 0,
+	WEI = 1,
+	SHU = 2,
+	WU = 3,
+	NONE = 4,
+	ENEMY = 5,
+	NPC = 6,
+	FORCE = 7,
+	FORCE01 = 11,
+	FORCE02 = 12,
+	FORCE03 = 13,
+	FORCE04 = 14,
+	FORCE05 = 15,
+	FORCE06 = 16,
+	FORCE07 = 17,
+	FORCE08 = 18,
+	FORCE09 = 19,
+	FORCE10 = 20,
+	FORCE11 = 21,
+	FORCE12 = 22
+}

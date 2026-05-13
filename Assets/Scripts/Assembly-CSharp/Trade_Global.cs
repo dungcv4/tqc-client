@@ -1,0 +1,5 @@
+internal enum Trade_Global
+{
+	MAX_TRADE_ITEM_DATA_SIZE = 200,
+	MAX_SEND_TRADE_ITEM_PART_NUMBER = 20
+}

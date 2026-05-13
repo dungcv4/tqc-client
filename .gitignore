@@ -1,0 +1,107 @@
+# ============================================================================
+# tqc-client — minimal track-set for rollback of OUR code changes only.
+# Push: C# scripts, tolua framework patches, Editor diagnostic scripts,
+#       Plugins (patched tolua.bundle), ProjectSettings, Packages.
+# Skip: Library/Temp cache, game IP assets (Texture2D/Mesh/Material/scenes),
+#       extracted Lua source (_Assets/), bundle staging data.
+# ============================================================================
+
+# === Unity standard ignores ===
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# Burst compiler
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+sysinfo.txt
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crash reports
+*.stackdump
+*.blob
+mono_crash.*
+crashlytics-build.properties
+
+# Visual Studio / Rider IDE / VS Code
+.vs/
+.idea/
+.vscode/
+*.csproj
+*.sln
+*.unityproj
+*.user
+*.userosscache
+*.suo
+*.tmp
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+
+# OS
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+
+# === Project-specific ===
+# CDN bundle download cache (downloaded at runtime, not source)
+CdnCache/
+
+# Loose dev artifacts at project root
+_first_open.log
+game_view.png
+*.log
+
+# AssetRipper artifacts
+AssetRipper.GUI.Free.log
+
+# ============================================================================
+# Assets/ selective tracking — exclude game IP, keep our code + patches.
+# Pattern: ignore everything under Assets/, then UN-ignore specific subdirs.
+# Keep both the directory and its sibling .meta file (Unity GUID link).
+# ============================================================================
+/Assets/*
+!/Assets/.gitignore
+!/Assets/.gitkeep
+
+# OUR work — code, patches, editor tooling
+!/Assets/Scripts/
+!/Assets/Scripts.meta
+!/Assets/Source/
+!/Assets/Source.meta
+!/Assets/ToLua/
+!/Assets/ToLua.meta
+!/Assets/Editor/
+!/Assets/Editor.meta
+!/Assets/Plugins/
+!/Assets/Plugins.meta
+
+# Unity-internal small dirs that hold project-level settings (not game IP)
+!/Assets/Scenes/
+!/Assets/Scenes.meta
+
+# (Explicitly skipped — game IP / large / not edited by us)
+# /Assets/AnimationClip/    /Assets/AnimatorController/   /Assets/Avatar/
+# /Assets/Cubemap/          /Assets/Font/                 /Assets/GameObject/
+# /Assets/GooglePlayPlugins/ /Assets/Material/            /Assets/Mesh/
+# /Assets/MonoBehaviour/    /Assets/RenderTexture/        /Assets/Resources/
+# /Assets/Shader/           /Assets/Sprite/               /Assets/StreamingAssets/
+# /Assets/TextAsset/        /Assets/Texture2D/            /Assets/_Assets/
+# /Assets/_artist/          /Assets/resources_bundle/     /Assets/textmesh/
+# /Assets/textmesh pro/

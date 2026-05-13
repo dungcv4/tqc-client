@@ -1,0 +1,137 @@
+using Cpp2IlInjected;
+
+namespace UnityEngine.PostProcessing
+{
+	public sealed class ColorGradingComponent : PostProcessingComponentRenderTexture<ColorGradingModel>
+	{
+		private static class Uniforms
+		{
+			internal static readonly int _LutParams;
+
+			internal static readonly int _NeutralTonemapperParams1;
+
+			internal static readonly int _NeutralTonemapperParams2;
+
+			internal static readonly int _HueShift;
+
+			internal static readonly int _Saturation;
+
+			internal static readonly int _Contrast;
+
+			internal static readonly int _Balance;
+
+			internal static readonly int _Lift;
+
+			internal static readonly int _InvGamma;
+
+			internal static readonly int _Gain;
+
+			internal static readonly int _Slope;
+
+			internal static readonly int _Power;
+
+			internal static readonly int _Offset;
+
+			internal static readonly int _ChannelMixerRed;
+
+			internal static readonly int _ChannelMixerGreen;
+
+			internal static readonly int _ChannelMixerBlue;
+
+			internal static readonly int _Curves;
+
+			internal static readonly int _LogLut;
+
+			internal static readonly int _LogLut_Params;
+
+			internal static readonly int _ExposureEV;
+
+			static Uniforms()
+			{
+				throw new AnalysisFailedException("No IL was generated.");
+			}
+		}
+
+		private const int k_InternalLogLutSize = 32;
+
+		private const int k_CurvePrecision = 128;
+
+		private const float k_CurveStep = 1f / 128f;
+
+		private Texture2D m_GradingCurves;
+
+		private Color[] m_pixels;
+
+		public override bool active
+		{
+			get
+			{ return default; }
+		}
+
+		private float StandardIlluminantY(float x)
+		{ return default; }
+
+		private Vector3 CIExyToLMS(float x, float y)
+		{ return default; }
+
+		private Vector3 CalculateColorBalance(float temperature, float tint)
+		{ return default; }
+
+		private static Color NormalizeColor(Color c)
+		{ return default; }
+
+		private static Vector3 ClampVector(Vector3 v, float min, float max)
+		{ return default; }
+
+		public static Vector3 GetLiftValue(Color lift)
+		{ return default; }
+
+		public static Vector3 GetGammaValue(Color gamma)
+		{ return default; }
+
+		public static Vector3 GetGainValue(Color gain)
+		{ return default; }
+
+		public static void CalculateLiftGammaGain(Color lift, Color gamma, Color gain, out Vector3 outLift, out Vector3 outGamma, out Vector3 outGain)
+		{ outLift = default; outGamma = default; outGain = default; }
+
+		public static Vector3 GetSlopeValue(Color slope)
+		{ return default; }
+
+		public static Vector3 GetPowerValue(Color power)
+		{ return default; }
+
+		public static Vector3 GetOffsetValue(Color offset)
+		{ return default; }
+
+		public static void CalculateSlopePowerOffset(Color slope, Color power, Color offset, out Vector3 outSlope, out Vector3 outPower, out Vector3 outOffset)
+		{ outSlope = default; outPower = default; outOffset = default; }
+
+		private TextureFormat GetCurveFormat()
+		{ return default; }
+
+		private Texture2D GetCurveTexture()
+		{ return default; }
+
+		private bool IsLogLutValid(RenderTexture lut)
+		{ return default; }
+
+		private RenderTextureFormat GetLutFormat()
+		{ return default; }
+
+		private void GenerateLut()
+		{ }
+
+		public override void Prepare(Material uberMaterial)
+		{ }
+
+		public void OnGUI()
+		{ }
+
+		public override void OnDisable()
+		{ }
+
+		public ColorGradingComponent()
+		{ }
+	}
+}

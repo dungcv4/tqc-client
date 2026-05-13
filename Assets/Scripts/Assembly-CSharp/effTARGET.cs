@@ -1,0 +1,13 @@
+public enum effTARGET
+{
+	ENEMY = 0,
+	SELF = 1,
+	SELF_ALL = 2,
+	NONE = 3,
+	CARRY_NPC = 4,
+	SELF_CNPC_PARTY = 5,
+	PARTY_ALL = 6,
+	PARTY_SINGLE = 7,
+	MATE = 8,
+	SELF_CARRY_NPC = 9
+}
