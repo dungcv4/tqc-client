@@ -182,22 +182,30 @@ public class AsyncWndFormCreator : IWndFormReady {
                     _state = 0;
                     return true;
                 loadAsset:
+                    UnityEngine.Debug.Log($"[CBLoadPrefab] loadAsset reached: name='{_this._name}' eID={_this._eWndFormID} _fr.null={_fr==null} bundleOP.null={(_fr!=null && _fr.bundleOP==null)}");
                     if (_fr == null || _fr.bundleOP == null)
                     {
+                        UnityEngine.Debug.LogError($"[CBLoadPrefab] BAIL: _fr or bundleOP null for {_this._name} eID={_this._eWndFormID} — WndRoot.showMask=false, _done=true");
                         WndRoot.showMask = false;
                         _this._done = true;
                         return false;
                     }
                     _abr = _fr.bundleOP.LoadAsync<GameObject>(_this._name);
+                    UnityEngine.Debug.Log($"[CBLoadPrefab] LoadAsync<GameObject>('{_this._name}') returned _abr.null={_abr==null}");
                     if (_abr == null)
                     {
                         // Editor fallback: try sync Load<T>
                         var prefabSync = _fr.bundleOP.Load<GameObject>(_this._name) as GameObject;
+                        UnityEngine.Debug.Log($"[CBLoadPrefab] sync Load fallback: prefabSync.null={prefabSync==null} for {_this._name}");
                         if (prefabSync != null)
                         {
                             AddCache(_this._resName, prefabSync);
                             if (_this._parent != null)
+                            {
+                                UnityEngine.Debug.Log($"[CBLoadPrefab] calling CreateWndFormAsync (sync path) for {_this._name} eID={_this._eWndFormID}");
                                 _this._parent.CreateWndFormAsync(_this._wnd, prefabSync, _this._eWndFormID, _this._args, _this._popup);
+                            }
+                            else UnityEngine.Debug.LogError($"[CBLoadPrefab] _parent null! for {_this._name}");
                         }
                         WndRoot.showMask = false;
                         _this._done = true;
@@ -208,13 +216,19 @@ public class AsyncWndFormCreator : IWndFormReady {
                     return true;
                 case 2:
                     _state = -1;
+                    UnityEngine.Debug.Log($"[CBLoadPrefab] case 2: _abr.null={_abr==null} _abr.asset.null={(_abr!=null && _abr.asset==null)} for {_this._name} eID={_this._eWndFormID}");
                     if (_abr != null && _abr.asset != null)
                     {
                         var prefab = _abr.asset as GameObject;
                         AddCache(_this._resName, prefab);
                         if (_this._parent != null)
+                        {
+                            UnityEngine.Debug.Log($"[CBLoadPrefab] calling CreateWndFormAsync (async path) for {_this._name} eID={_this._eWndFormID}");
                             _this._parent.CreateWndFormAsync(_this._wnd, prefab, _this._eWndFormID, _this._args, _this._popup);
+                        }
+                        else UnityEngine.Debug.LogError($"[CBLoadPrefab] _parent null in case 2 for {_this._name}");
                     }
+                    else UnityEngine.Debug.LogError($"[CBLoadPrefab] case 2 BAIL: _abr or _abr.asset null for {_this._name}");
                     _abr = null;
                     WndRoot.showMask = false;
                     _this._done = true;

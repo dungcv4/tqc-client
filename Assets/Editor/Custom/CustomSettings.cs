@@ -105,6 +105,18 @@ public static class CustomSettings
         _GT(typeof(UVAnimation)),
         _GT(typeof(WndClickMethod)),
         _GT(typeof(WndForm)),
+        // Source: dump.cs TypeDefIndex 217+218 — WndProperty, WndSubProperty.
+        // Lua WndForm_LoginGame:RefreshServerList line 638 calls GetComponent(typeof(WndSubProperty)).
+        // Without registration, `typeof(WndSubProperty)` returns nil → LuaException attempt to call typeof on nil.
+        _GT(typeof(WndProperty)),
+        _GT(typeof(WndSubProperty)),
+        // Source: dump.cs TypeDefIndex 609 (WndForm_LoadingScreenWrap) + 610 (WndForm_LuaWrap)
+        // These two are the ONLY WndForm subclasses with C# tolua# wraps in production
+        // (other WndForm_* are Lua-side classes accessed via WndForm_Lua). Without these
+        // registered, `Process/ProcessLoginGame:133: attempt to index global 'WndForm_LoadingScreen'`
+        // because Lua VM cannot resolve the C# type.
+        _GT(typeof(WndForm_LoadingScreen)),
+        _GT(typeof(WndForm_Lua)),
         _GT(typeof(WndParticle)),
         _GT(typeof(WndRoot)),
         _GT(typeof(WrdFileMgr)),
@@ -173,6 +185,8 @@ public static class CustomSettings
         _GT(typeof(UnityEngine.UI.ToggleGroup)),
         _GT(typeof(UnityEngine.UI.VerticalLayoutGroup)),
         _GT(typeof(UnityEngine.WrapMode)),
+        // Lua WndForm_MsgWindow:54+ uses TextAnchor.IntToEnum for Text.alignment.
+        _GT(typeof(UnityEngine.TextAnchor)),
         _GT(typeof(TMPro.TextMeshProUGUI)),
         _GT(typeof(Spine.Unity.SkeletonGraphic)),
 
@@ -196,6 +210,19 @@ public static class CustomSettings
 
         _GT(typeof(UnityEngine.Touch)),
         _GT(typeof(TResource2)),
+
+        // UnityEngine.PostProcessing — Stack v1 vendored types (dump.cs TypeDefIndex 1029-1066).
+        // Production has 31 wraps (PostProcessingBehaviour, Profile, all *Model + *Model.Settings).
+        // Lua (PostProcessMgr.lua) directly typeof()s PostProcessingBehaviour and PostProcessingProfile;
+        // accesses .vignette, .depthOfField, their .enabled/.settings fields, and Settings struct fields.
+        _GT(typeof(UnityEngine.ScriptableObject)),  // dump.cs TypeDefIndex 566 — used by Lua: ScriptableObject.CreateInstance(type)
+        _GT(typeof(UnityEngine.PostProcessing.PostProcessingBehaviour)),
+        _GT(typeof(UnityEngine.PostProcessing.PostProcessingProfile)),
+        _GT(typeof(UnityEngine.PostProcessing.PostProcessingModel)),
+        _GT(typeof(UnityEngine.PostProcessing.VignetteModel)),
+        _GT(typeof(UnityEngine.PostProcessing.VignetteModel.Settings)),
+        _GT(typeof(UnityEngine.PostProcessing.DepthOfFieldModel)),
+        _GT(typeof(UnityEngine.PostProcessing.DepthOfFieldModel.Settings)),
     };
 
     static BindType _GT(Type t) { return new BindType(t); }

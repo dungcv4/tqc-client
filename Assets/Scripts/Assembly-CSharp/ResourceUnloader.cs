@@ -18,28 +18,23 @@ public class ResourceUnloader
     private static bool s_switchScene;
     private static AsyncOperation s_asyncOP;
 
-    // Source: Ghidra get_idle.c RVA 0x017bfb04 — return s_whenIdle (byte at +5)
-    public static bool get_idle()
+    // Source: Ghidra get_idle.c RVA 0x017bfb04 + set_idle.c RVA 0x017bfb4c
+    // Original C# is a PROPERTY (IL2CPP compiles `bool idle { get; set; }` to get_idle/set_idle methods).
+    // Lua accesses via `ResourceUnloader.idle = true` — requires property registered with RegVar in wrap,
+    // not get_X/set_X methods registered with RegFunction.
+    public static bool idle
     {
-        return s_whenIdle;
+        get { return s_whenIdle; }
+        set { s_whenIdle = value; }
     }
 
-    // Source: Ghidra set_idle.c RVA 0x017bfb4c — *(byte*)(+5) = value & 1
-    public static void set_idle(bool value)
+    // Source: Ghidra get_switchScene.c RVA 0x017bfb9c + set_switchScene.c RVA 0x017bfbe4
+    // Original C# is a PROPERTY (same reason as `idle` above).
+    // Lua AudioManager:CheckIsPlaying line 231: `ResourceUnloader.switchScene = true` — property access.
+    public static bool switchScene
     {
-        s_whenIdle = value;
-    }
-
-    // Source: Ghidra get_switchScene.c RVA 0x017bfb9c — return s_switchScene (byte at +6)
-    public static bool get_switchScene()
-    {
-        return s_switchScene;
-    }
-
-    // Source: Ghidra set_switchScene.c RVA 0x017bfbe4 — *(byte*)(+6) = value & 1
-    public static void set_switchScene(bool value)
-    {
-        s_switchScene = value;
+        get { return s_switchScene; }
+        set { s_switchScene = value; }
     }
 
     // Source: Ghidra Start.c RVA 0x017bfc34

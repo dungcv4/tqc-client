@@ -1283,22 +1283,41 @@ public sealed class AssetBundleManager : MonoBehaviour
         public int refCount { get { return _refCount; } }
 
         // RVA: 0x15D26D0  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/.ctor.c
+        // Source: Ghidra work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/.ctor.c RVA 0x015d26d0
+        // 1-1 (verified field offsets via dump.cs):
+        //   _error = ""      (offset 0x30 — first assignment, via write barrier)
+        //   base..ctor()
+        //   _info = info     (offset 0x38)
+        //   if (_info != null) {
+        //       _info._wwwRef = this  (info field at offset 0x38)
+        //       _refCount = 1   ← CRITICAL: offset 0x10. Ghidra `*(int *)(this + 0x10) = 1`.
+        //       _www = www      (offset 0x18)
+        //       _wwwLocal = wwwLocal  (offset 0x20)
+        //       _loadLocal = bLocal   (offset 0x28)
+        //       s_queue.Enqueue(this)
+        //       return;
+        //   }
+        //   FAULT (NRE on info==null)
         public WWWBundleRef(UnityWebRequest www, AssetBundleCreateRequest wwwLocal, bool bLocal, AssetBundleManager.BundleInfo info)
         {
-            // TODO: confidence:low — ctor body not separately decompiled; field-store pattern only.
-            _www = www;
-            _wwwLocal = wwwLocal;
-            _loadLocal = bLocal;
-            _info = info;
             _error = string.Empty;
+            _info = info;
             if (info != null)
             {
                 info._wwwRef = this;
+                _refCount = 1;   // 1-1 Ghidra: ctor sets _refCount=1, NOT 0. Without this, CheckExpired
+                                 // sees _refCount<1 on first poll and Unload()s the bundle before LoadAsync fires.
+                _www = www;
+                _wwwLocal = wwwLocal;
+                _loadLocal = bLocal;
+                if (s_queue != null)
+                {
+                    s_queue.Enqueue(this);
+                }
+                return;
             }
-            if (s_queue != null)
-            {
-                s_queue.Enqueue(this);
-            }
+            // Ghidra fallthrough → FUN_015cb8fc (NRE) when info == null
+            throw new System.NullReferenceException("WWWBundleRef.ctor: info null");
         }
 
         // RVA: 0x15D2804/0x15D280C  Ghidra: get_error.c + set_error.c (merged property)
@@ -1378,34 +1397,57 @@ public sealed class AssetBundleManager : MonoBehaviour
         // (GC reclaims when both references drop, just like Ghidra IL2CPP).
         public void Finish()
         {
+            string infoFile = (_info != null) ? _info._file : "<null>";
+            UnityEngine.Debug.Log($"[WWWBundleRef.Finish] ENTRY file='{infoFile}' _www.null={_www==null} _loadLocal={_loadLocal} _wwwLocal.null={_wwwLocal==null}");
             if (_www == null)
             {
                 if (!_loadLocal) goto END;
                 if (_wwwLocal == null) throw new System.NullReferenceException();
                 AssetBundle ab = _wwwLocal.assetBundle;
+                UnityEngine.Debug.Log($"[WWWBundleRef.Finish] local path: ab.null={ab==null} file='{infoFile}'");
                 if (ab != null) _bundle = ab;
             }
             else
             {
                 string err = _www.error;
+                UnityEngine.Debug.Log($"[WWWBundleRef.Finish] www path: error='{err}' url='{_www.url}' file='{infoFile}'");
                 if (string.IsNullOrEmpty(err))
                 {
                     // Ghidra: _error = Format("Url: {0}", _www.url) — temp set, then overwritten to empty.
                     // (Ghidra lines 51-57: writes formatted url string, then line 71 overwrites with "".)
                     _error = string.Format("Url: {0}", _www.url);
                     DownloadHandler dh = _www.downloadHandler;
+                    string dhType = (dh != null) ? dh.GetType().Name : "<null>";
+                    UnityEngine.Debug.Log($"[WWWBundleRef.Finish] downloadHandler type={dhType} file='{infoFile}'");
                     if (dh is DownloadHandlerAssetBundle)
                     {
-                        _bundle = ((DownloadHandlerAssetBundle)dh).assetBundle;
+                        var ab = ((DownloadHandlerAssetBundle)dh).assetBundle;
+                        UnityEngine.Debug.Log($"[WWWBundleRef.Finish] dhAB.assetBundle.null={ab==null} file='{infoFile}'");
+                        _bundle = ab;
+                        if (ab != null)
+                        {
+                            try {
+                                string[] names = ab.GetAllAssetNames();
+                                UnityEngine.Debug.Log($"[WWWBundleRef.Finish] file='{infoFile}' bundle.assetCount={names.Length} firstAsset='{(names.Length>0?names[0]:"<empty>")}'");
+                            } catch (System.Exception e) {
+                                UnityEngine.Debug.LogError($"[WWWBundleRef.Finish] GetAllAssetNames threw for file='{infoFile}': {e.Message}");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        UnityEngine.Debug.LogError($"[WWWBundleRef.Finish] dh NOT DownloadHandlerAssetBundle (type={dhType}) — _bundle stays null for file='{infoFile}'");
                     }
                     _error = string.Empty;
                 }
                 else
                 {
+                    UnityEngine.Debug.LogError($"[WWWBundleRef.Finish] www.error='{err}' for file='{infoFile}'");
                     _error = err;
                 }
             }
             END:
+            UnityEngine.Debug.Log($"[WWWBundleRef.Finish] END _bundle.null={_bundle==null} _done=true file='{infoFile}'");
             _wwwLocal = null;
             _loadLocal = false;
             _www = null;       // ← set null, NOT Dispose (per Ghidra)
@@ -1443,24 +1485,25 @@ public sealed class AssetBundleManager : MonoBehaviour
         }
 
         // RVA: 0x15D2B60  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/Load.c
+        // 1-1: if (_bundle != null) return _bundle.LoadAsset(name); else return null. NOT throw.
         public UnityEngine.Object Load(string name)
         {
-            // TODO: confidence:low — Load.c shared between overloads; pattern: _bundle.LoadAsset(name).
-            if (_bundle == null)
+            if (_bundle != null)
             {
-                throw new System.NullReferenceException();
+                return _bundle.LoadAsset(name);
             }
-            return _bundle.LoadAsset(name);
+            return null;
         }
 
         // RVA: 0x15D2BFC  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/Load.c
+        // 1-1: if (_bundle != null) return _bundle.LoadAsset(name, type); else return null. NOT throw.
         public UnityEngine.Object Load(string name, Type type)
         {
-            if (_bundle == null)
+            if (_bundle != null)
             {
-                throw new System.NullReferenceException();
+                return _bundle.LoadAsset(name, type);
             }
-            return _bundle.LoadAsset(name, type);
+            return null;
         }
 
         // RVA: 0x1C8D514  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/Load_object_.c
@@ -1476,13 +1519,17 @@ public sealed class AssetBundleManager : MonoBehaviour
         }
 
         // RVA: 0x15D2CA0  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/LoadAsync.c
+        // 1-1: if (_bundle != null) return _bundle.LoadAssetAsync(name, type); else return null. NOT throw.
+        // (Ghidra checks Object.op_Inequality(_bundle, null) THEN raw `_bundle != 0`; the defensive
+        // second check is a race-handling artifact in il2cpp — Unity-aware `_bundle != null` in C#
+        // covers both cases via overloaded operator.)
         public AssetBundleRequest LoadAsync(string name, Type type)
         {
-            if (_bundle == null)
+            if (_bundle != null)
             {
-                throw new System.NullReferenceException();
+                return _bundle.LoadAssetAsync(name, type);
             }
-            return _bundle.LoadAssetAsync(name, type);
+            return null;
         }
 
         // RVA: 0x1C8D5BC  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/LoadAsync_object_.c
@@ -1498,23 +1545,25 @@ public sealed class AssetBundleManager : MonoBehaviour
         }
 
         // RVA: 0x15D2D44  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/LoadAll.c
+        // 1-1: if (_bundle != null) return _bundle.LoadAllAssets(); else return null. NOT throw.
         public UnityEngine.Object[] LoadAll()
         {
-            if (_bundle == null)
+            if (_bundle != null)
             {
-                throw new System.NullReferenceException();
+                return _bundle.LoadAllAssets();
             }
-            return _bundle.LoadAllAssets();
+            return null;
         }
 
         // RVA: 0x15D2DCC  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/LoadAllAsync.c
+        // 1-1: if (_bundle != null) return _bundle.LoadAllAssetsAsync(); else return null. NOT throw.
         public AssetBundleRequest LoadAllAsync()
         {
-            if (_bundle == null)
+            if (_bundle != null)
             {
-                throw new System.NullReferenceException();
+                return _bundle.LoadAllAssetsAsync();
             }
-            return _bundle.LoadAllAssetsAsync();
+            return null;
         }
 
         // RVA: 0x1C8D664  Ghidra: work/06_ghidra/decompiled_full/AssetBundleManager.WWWBundleRef/LoadWithSubAssets_object_.c

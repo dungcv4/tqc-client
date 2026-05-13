@@ -278,7 +278,7 @@ public class WndClickMethod : IWndComponent, IPointerClickHandler, IPointerDownH
         {
             // Ghidra: SoundProxy__PlaySoundByName(volume=1.0f, pitch=1.0f, this=SoundProxy.main, name=literal#4107, fullPath=0, methodInfo=0)
             // C# signature: PlaySoundByName(string name, float volume=1f, float pitch=1f, bool fullPath=false)
-            SoundProxy.get_main().PlaySoundByName(STR_BTN_CLICK_SOUND, 1f, 1f, false);
+            SoundProxy.main.PlaySoundByName(STR_BTN_CLICK_SOUND, 1f, 1f, false);
         }
 
         if (UseTween)

@@ -7,13 +7,6 @@ public class SoundProxyWrap
 	public static void Register(LuaState L)
 	{
 		L.BeginClass(typeof(SoundProxy), typeof(UnityEngine.MonoBehaviour));
-		L.RegFunction("get_main", get_main);
-		L.RegFunction("get_Disable", get_Disable);
-		L.RegFunction("set_Disable", set_Disable);
-		L.RegFunction("get_masterVolume", get_masterVolume);
-		L.RegFunction("set_masterVolume", set_masterVolume);
-		L.RegFunction("get_dubbingVolume", get_dubbingVolume);
-		L.RegFunction("set_dubbingVolume", set_dubbingVolume);
 		L.RegFunction("Save", Save);
 		L.RegFunction("get_audio3D", get_audio3D);
 		L.RegFunction("get_isPlaying", get_isPlaying);
@@ -33,119 +26,11 @@ public class SoundProxyWrap
 		L.RegConstant("CMinVolume", 0);
 		L.RegConstant("CMaxVoulume", 1);
 		L.RegVar("_isMain", get__isMain, set__isMain);
+		L.RegVar("main", get_main, null);
+		L.RegVar("Disable", get_Disable, set_Disable);
+		L.RegVar("masterVolume", get_masterVolume, set_masterVolume);
+		L.RegVar("dubbingVolume", get_dubbingVolume, set_dubbingVolume);
 		L.EndClass();
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int get_main(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 0);
-			SoundProxy o = SoundProxy.get_main();
-			ToLua.PushSealed(L, o);
-			return 1;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int get_Disable(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 0);
-			bool o = SoundProxy.get_Disable();
-			LuaDLL.lua_pushboolean(L, o);
-			return 1;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int set_Disable(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 1);
-			bool arg0 = LuaDLL.luaL_checkboolean(L, 1);
-			SoundProxy.set_Disable(arg0);
-			return 0;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int get_masterVolume(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 0);
-			float o = SoundProxy.get_masterVolume();
-			LuaDLL.lua_pushnumber(L, o);
-			return 1;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int set_masterVolume(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 1);
-			float arg0 = (float)LuaDLL.luaL_checknumber(L, 1);
-			SoundProxy.set_masterVolume(arg0);
-			return 0;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int get_dubbingVolume(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 0);
-			float o = SoundProxy.get_dubbingVolume();
-			LuaDLL.lua_pushnumber(L, o);
-			return 1;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int set_dubbingVolume(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 1);
-			float arg0 = (float)LuaDLL.luaL_checknumber(L, 1);
-			SoundProxy.set_dubbingVolume(arg0);
-			return 0;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
 	}
 
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
@@ -625,6 +510,62 @@ public class SoundProxyWrap
 	}
 
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int get_main(IntPtr L)
+	{
+		try
+		{
+			ToLua.PushSealed(L, SoundProxy.main);
+			return 1;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int get_Disable(IntPtr L)
+	{
+		try
+		{
+			LuaDLL.lua_pushboolean(L, SoundProxy.Disable);
+			return 1;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int get_masterVolume(IntPtr L)
+	{
+		try
+		{
+			LuaDLL.lua_pushnumber(L, SoundProxy.masterVolume);
+			return 1;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int get_dubbingVolume(IntPtr L)
+	{
+		try
+		{
+			LuaDLL.lua_pushnumber(L, SoundProxy.dubbingVolume);
+			return 1;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
 	static int set__isMain(IntPtr L)
 	{
 		object o = null;
@@ -640,6 +581,51 @@ public class SoundProxyWrap
 		catch(Exception e)
 		{
 			return LuaDLL.toluaL_exception(L, e, o, "attempt to index _isMain on a nil value");
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int set_Disable(IntPtr L)
+	{
+		try
+		{
+			bool arg0 = LuaDLL.luaL_checkboolean(L, 2);
+			SoundProxy.Disable = arg0;
+			return 0;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int set_masterVolume(IntPtr L)
+	{
+		try
+		{
+			float arg0 = (float)LuaDLL.luaL_checknumber(L, 2);
+			SoundProxy.masterVolume = arg0;
+			return 0;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int set_dubbingVolume(IntPtr L)
+	{
+		try
+		{
+			float arg0 = (float)LuaDLL.luaL_checknumber(L, 2);
+			SoundProxy.dubbingVolume = arg0;
+			return 0;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
 		}
 	}
 }

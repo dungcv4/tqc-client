@@ -83,7 +83,7 @@ public class WndAudioClip : MonoBehaviour, IPointerDownHandler
     // Body: SoundProxy.main.Play(_audioClip, volume, pitch)
     public void PlaySound(float volume, float pitch)
     {
-        SoundProxy sp = SoundProxy.get_main();
+        SoundProxy sp = SoundProxy.main;
         if (sp == null) throw new System.NullReferenceException();
         sp.Play(_audioClip, volume, pitch);
     }
@@ -107,7 +107,7 @@ public class WndAudioClip : MonoBehaviour, IPointerDownHandler
     {
         if (!_pressEvent) return;
         if (_audioClip == null) return;
-        SoundProxy sp = SoundProxy.get_main();
+        SoundProxy sp = SoundProxy.main;
         if (sp == null) throw new System.NullReferenceException();
         sp.Play(_audioClip, _volume, _pitch);
     }

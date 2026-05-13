@@ -7,15 +7,18 @@ public class ResourceUnloaderWrap
 	public static void Register(LuaState L)
 	{
 		L.BeginClass(typeof(ResourceUnloader), typeof(System.Object));
-		L.RegFunction("get_idle", get_idle);
-		L.RegFunction("set_idle", set_idle);
-		L.RegFunction("get_switchScene", get_switchScene);
-		L.RegFunction("set_switchScene", set_switchScene);
 		L.RegFunction("Start", Start);
 		L.RegFunction("Update", Update);
 		L.RegFunction("DoUnloadNow", DoUnloadNow);
 		L.RegFunction("New", _CreateResourceUnloader);
 		L.RegFunction("__tostring", ToLua.op_ToString);
+		// HAND-FIX: changed get_X/set_X RegFunction → RegVar to match production property semantics.
+		// Original C# was `public static bool idle { get; set; }` and `public static bool switchScene { get; set; }`.
+		// IL2CPP compiled props to get_/set_ accessor methods, but the property NAMES are what Lua uses.
+		// Auto-gen incorrectly emitted RegFunction for both accessor methods. Lua code does
+		// `ResourceUnloader.switchScene = true` (property write) which requires RegVar.
+		L.RegVar("idle", get_idle, set_idle);
+		L.RegVar("switchScene", get_switchScene, set_switchScene);
 		L.EndClass();
 	}
 
@@ -43,13 +46,15 @@ public class ResourceUnloaderWrap
 		}
 	}
 
+	// HAND-FIX: RegVar callbacks read/write the C# property directly.
+	// For RegVar getter: receives L, reads slot 1 (self/static class), pushes value.
+	// For RegVar setter: receives L, reads slot 2 (new value), writes property.
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
 	static int get_idle(IntPtr L)
 	{
 		try
 		{
-			ToLua.CheckArgsCount(L, 0);
-			bool o = ResourceUnloader.get_idle();
+			bool o = ResourceUnloader.idle;
 			LuaDLL.lua_pushboolean(L, o);
 			return 1;
 		}
@@ -64,9 +69,8 @@ public class ResourceUnloaderWrap
 	{
 		try
 		{
-			ToLua.CheckArgsCount(L, 1);
-			bool arg0 = LuaDLL.luaL_checkboolean(L, 1);
-			ResourceUnloader.set_idle(arg0);
+			bool arg0 = LuaDLL.luaL_checkboolean(L, 2);
+			ResourceUnloader.idle = arg0;
 			return 0;
 		}
 		catch (Exception e)
@@ -80,8 +84,7 @@ public class ResourceUnloaderWrap
 	{
 		try
 		{
-			ToLua.CheckArgsCount(L, 0);
-			bool o = ResourceUnloader.get_switchScene();
+			bool o = ResourceUnloader.switchScene;
 			LuaDLL.lua_pushboolean(L, o);
 			return 1;
 		}
@@ -96,9 +99,8 @@ public class ResourceUnloaderWrap
 	{
 		try
 		{
-			ToLua.CheckArgsCount(L, 1);
-			bool arg0 = LuaDLL.luaL_checkboolean(L, 1);
-			ResourceUnloader.set_switchScene(arg0);
+			bool arg0 = LuaDLL.luaL_checkboolean(L, 2);
+			ResourceUnloader.switchScene = arg0;
 			return 0;
 		}
 		catch (Exception e)

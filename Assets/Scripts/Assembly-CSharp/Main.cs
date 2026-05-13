@@ -1056,6 +1056,15 @@ public class Main : MonoBehaviour
             if (mainCam != null)
             {
                 _MainCamera = mainCam;
+                // Source: Ghidra SetupScreenSize.c line 281 — between `_MainCamera = mainCam` and
+                // `DontDestroyOnLoad`, production calls AddComponent<object>(camera.gameObject, PTR_DAT_034483a8).
+                // PTR_DAT_034483a8 is a class metadata slot init'd by FUN_015cb66c (il2cpp_runtime_class_init);
+                // by elimination from co-located DAT pointers (034483a0/b0/b8 all Camera/Camera[]),
+                // and given PlayerCamControl is the only camera-controller component used by Lua
+                // (ProcessLoginGame.V_Enter line 60 + SystemSetting.SetCameraPerspective), the
+                // missing AddComponent is PlayerCamControl. Adding here matches production scene
+                // bootstrap: MainCamera GO gets PlayerCamControl attached, Start() sets Instance = this.
+                mainCam.gameObject.AddComponent<PlayerCamControl>();
                 UnityEngine.Object.DontDestroyOnLoad(mainCam);
                 UnityEngine.Camera[] subCams = _MainCamera.GetComponentsInChildren<UnityEngine.Camera>();
                 if (subCams != null)

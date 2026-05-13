@@ -8,9 +8,6 @@ public class MusicProxyWrap
 	public static void Register(LuaState L)
 	{
 		L.BeginClass(typeof(MusicProxy), typeof(UnityEngine.MonoBehaviour));
-		L.RegFunction("get_main", get_main);
-		L.RegFunction("get_masterVolume", get_masterVolume);
-		L.RegFunction("set_masterVolume", set_masterVolume);
 		L.RegFunction("Save", Save);
 		L.RegFunction("Play", Play);
 		L.RegFunction("Stop", Stop);
@@ -25,55 +22,9 @@ public class MusicProxyWrap
 		L.RegConstant("CMaxVoulume", 1);
 		L.RegVar("_isMain", get__isMain, set__isMain);
 		L.RegVar("_CachedAudio", get__CachedAudio, set__CachedAudio);
+		L.RegVar("main", get_main, null);
+		L.RegVar("masterVolume", get_masterVolume, set_masterVolume);
 		L.EndClass();
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int get_main(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 0);
-			MusicProxy o = MusicProxy.get_main();
-			ToLua.PushSealed(L, o);
-			return 1;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int get_masterVolume(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 0);
-			float o = MusicProxy.get_masterVolume();
-			LuaDLL.lua_pushnumber(L, o);
-			return 1;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
-	}
-
-	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
-	static int set_masterVolume(IntPtr L)
-	{
-		try
-		{
-			ToLua.CheckArgsCount(L, 1);
-			float arg0 = (float)LuaDLL.luaL_checknumber(L, 1);
-			MusicProxy.set_masterVolume(arg0);
-			return 0;
-		}
-		catch (Exception e)
-		{
-			return LuaDLL.toluaL_exception(L, e);
-		}
 	}
 
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
@@ -318,6 +269,34 @@ public class MusicProxyWrap
 	}
 
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int get_main(IntPtr L)
+	{
+		try
+		{
+			ToLua.PushSealed(L, MusicProxy.main);
+			return 1;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int get_masterVolume(IntPtr L)
+	{
+		try
+		{
+			LuaDLL.lua_pushnumber(L, MusicProxy.masterVolume);
+			return 1;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
 	static int set__isMain(IntPtr L)
 	{
 		object o = null;
@@ -352,6 +331,21 @@ public class MusicProxyWrap
 		catch(Exception e)
 		{
 			return LuaDLL.toluaL_exception(L, e, o, "attempt to index _CachedAudio on a nil value");
+		}
+	}
+
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int set_masterVolume(IntPtr L)
+	{
+		try
+		{
+			float arg0 = (float)LuaDLL.luaL_checknumber(L, 2);
+			MusicProxy.masterVolume = arg0;
+			return 0;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
 		}
 	}
 }

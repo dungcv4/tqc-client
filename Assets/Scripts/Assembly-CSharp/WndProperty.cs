@@ -26,6 +26,12 @@ public class WndProperty : IWndComponent
     //   On false return → stop iteration.
     public override void InitComponent(WndForm wnd)
     {
+        // PHASE B DIAG — TODO: remove after _jobBtnGroup fix verified
+        var hostName = (this != null && this.gameObject != null) ? this.gameObject.name : "<null>";
+        var wndName = (wnd != null) ? wnd.GetType().Name : "<null>";
+        int propsLen = (_properties != null) ? _properties.Length : -1;
+        Debug.Log($"[WndProperty.InitComponent] host={hostName} wnd={wndName} props={propsLen}");
+
         if (wnd == null) return;
         if (_properties == null) return;
         object owner = null;
@@ -36,11 +42,23 @@ public class WndProperty : IWndComponent
             if (string.IsNullOrEmpty(prop._name)) continue;
             if (owner == null) owner = wnd;
             Type t = owner.GetType();
+
+            // PHASE B DIAG — Unity-aware null check (destroyed Object.name throws NRE)
+            string objStr;
+            if (prop._object == null) objStr = "<null>";
+            else
+            {
+                var po = prop._object;  // UnityEngine.Object
+                objStr = (po != null) ? po.GetType().Name + ":" + po.name : po.GetType().Name + ":<destroyed>";
+            }
+            Debug.Log($"[WndProperty.InitComponent]   prop[{i}] act={prop._act} name='{prop._name}' idx={prop._index} obj={objStr} ownerType={t.Name}");
+
             if (t == typeof(WndForm_Lua) || t.IsSubclassOf(typeof(WndForm_Lua)))
             {
                 WndForm_Lua wfl = owner as WndForm_Lua;
                 if (wfl == null) throw new System.NullReferenceException();
                 bool ok = wfl.WndPropertyData(prop._act, prop._name, prop._index, prop._object, false);
+                Debug.Log($"[WndProperty.InitComponent]   → WndPropertyData(Lua) returned ok={ok}");
                 if (!ok) return;
                 continue;
             }

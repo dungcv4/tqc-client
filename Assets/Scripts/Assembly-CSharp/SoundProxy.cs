@@ -64,114 +64,53 @@ public sealed class SoundProxy : MonoBehaviour, IGameAudioMgr
     private int _maxActiveDubbingSource;
     private float _pauseUnloadTimer;
 
-    // Source: Ghidra work/06_ghidra/decompiled_full/SoundProxy/get_main.c RVA 0x017c02d0
-    // Reads s_main (static at offset +8). Class-init guard handled by JIT in C#.
-    public static SoundProxy get_main()
+    // Source: dump.cs declares BOTH property + explicit get_main() (separate IL2Cpp entries).
+    // C# can only express the property; underlying auto-gen `get_main()` matches dump's RVA 0x017c02d0.
+    // Lua needs property form (`SoundProxy.main.masterVolume` in AudioManager:115) → RegVar.
+    public static SoundProxy main { get { return s_main; } }
+
+    // dump.cs `public static bool Disable { get; set; }` (+ explicit get/set at RVA 0x017c0328/0x017c0380).
+    // C# expresses as property; auto-gen accessors match dump's RVAs semantically.
+    public static bool Disable
     {
-        return s_main;
+        get { return s_disable; }
+        set { s_disable = value; }
     }
 
-    // Source: Ghidra work/06_ghidra/decompiled_full/SoundProxy/get_Disable.c RVA 0x017c0328
-    // Reads s_disable (static at offset +0x10).
-    public static bool get_Disable()
+    // dump.cs `public static float masterVolume { get; set; }` (+ explicit RVAs 0x017c03e0 / 0x017c0438).
+    // Property form so Lua `SoundProxy.main.masterVolume = X` (AudioManager:115) works via RegVar.
+    public static float masterVolume
     {
-        return s_disable;
+        get { return s_masterVolume; }
+        // Ghidra 1-1: clamp value to [0,1] only when current was non-negative-and-<=1; write-through to PlayerPrefs.
+        set
+        {
+            float current = s_masterVolume;
+            float v = (0f <= current) ? value : 0f;
+            current = s_masterVolume;
+            float clamped = (current <= 1f) ? v : 1f;
+            if (current == clamped) return;
+            s_masterVolume = clamped;
+            UnityEngine.PlayerPrefs.SetFloat(CPrefKey_SoundVolume, clamped);
+        }
     }
 
-    // Source: Ghidra work/06_ghidra/decompiled_full/SoundProxy/set_Disable.c RVA 0x017c0380
-    // Writes s_disable & 1.
-    public static void set_Disable(bool value)
+    // dump.cs `public static float dubbingVolume { get; set; }` (+ explicit RVAs 0x017c0544 / 0x017c059c).
+    // get body = Ghidra get_dubbingVolume.c (return s_dubbingVolume).
+    // set body = Ghidra set_dubbingVolume.c — same branch structure as masterVolume, key=CPrefKey_DubbingVolume.
+    public static float dubbingVolume
     {
-        s_disable = value;
-    }
-
-    // Source: Ghidra work/06_ghidra/decompiled_full/SoundProxy/get_masterVolume.c RVA 0x017c03e0
-    // Reads s_masterVolume (static at offset +4).
-    public static float get_masterVolume()
-    {
-        return s_masterVolume;
-    }
-
-    // Source: Ghidra work/06_ghidra/decompiled_full/SoundProxy/set_masterVolume.c RVA 0x017c0438
-    // 1-1 logic from Ghidra:
-    //   float current = s_masterVolume;
-    //   float clamped = (current >= 0f) ? value : 0f;     // (1st branch: if current >= 0 use value; else 0)
-    //   // re-read current (Ghidra re-fetches after class init)
-    //   if (current <= 1f) clamped = clamped; else clamped = 1f;
-    //   if (current == clamped) return;
-    //   s_masterVolume = clamped;
-    //   PlayerPrefs.SetFloat("SoundVolume", clamped);
-    // Effective semantics: clamp `value` to [0,1] only when current was non-negative-and-<=1;
-    // ALWAYS write through to s_masterVolume + PlayerPrefs unless equal.
-    // We mirror the exact branch tree below.
-    public static void set_masterVolume(float value)
-    {
-        float current = s_masterVolume;
-        float v;
-        if (0f <= current)
+        get { return s_dubbingVolume; }
+        set
         {
-            v = value;
+            float current = s_dubbingVolume;
+            float v = (0f <= current) ? value : 0f;
+            current = s_dubbingVolume;
+            float clamped = (current <= 1f) ? v : 1f;
+            if (current == clamped) return;
+            s_dubbingVolume = clamped;
+            UnityEngine.PlayerPrefs.SetFloat(CPrefKey_DubbingVolume, clamped);
         }
-        else
-        {
-            v = 0f;
-        }
-        // re-fetch current (Ghidra re-reads field after class init re-check)
-        current = s_masterVolume;
-        float clamped;
-        if (current <= 1f)
-        {
-            clamped = v;
-        }
-        else
-        {
-            clamped = 1f;
-        }
-        if (current == clamped)
-        {
-            return;
-        }
-        s_masterVolume = clamped;
-        UnityEngine.PlayerPrefs.SetFloat(CPrefKey_SoundVolume, clamped);
-    }
-
-    // Source: Ghidra work/06_ghidra/decompiled_full/SoundProxy/get_dubbingVolume.c RVA 0x017c0544
-    // Reads s_dubbingVolume (static at offset +0x14).
-    public static float get_dubbingVolume()
-    {
-        return s_dubbingVolume;
-    }
-
-    // Source: Ghidra work/06_ghidra/decompiled_full/SoundProxy/set_dubbingVolume.c RVA 0x017c059c
-    // Same branch structure as set_masterVolume but writes "DubbingVolume" key.
-    public static void set_dubbingVolume(float value)
-    {
-        float current = s_dubbingVolume;
-        float v;
-        if (0f <= current)
-        {
-            v = value;
-        }
-        else
-        {
-            v = 0f;
-        }
-        current = s_dubbingVolume;
-        float clamped;
-        if (current <= 1f)
-        {
-            clamped = v;
-        }
-        else
-        {
-            clamped = 1f;
-        }
-        if (current == clamped)
-        {
-            return;
-        }
-        s_dubbingVolume = clamped;
-        UnityEngine.PlayerPrefs.SetFloat(CPrefKey_DubbingVolume, clamped);
     }
 
     // Source: Ghidra work/06_ghidra/decompiled_full/SoundProxy/Save.c RVA 0x017c06a8
@@ -388,7 +327,7 @@ public sealed class SoundProxy : MonoBehaviour, IGameAudioMgr
             _pauseUnloadTimer = _pauseUnloadTimer - delta;
             if (_pauseUnloadTimer <= 0f)
             {
-                ResourceUnloader.set_idle(false);
+                ResourceUnloader.idle = false;
             }
         }
     }
@@ -998,7 +937,7 @@ public sealed class SoundProxy : MonoBehaviour, IGameAudioMgr
     //   _pauseUnloadTimer = _pauseUnloadTimer + clip.length;
     private void PauseUnload(AudioClip clip)
     {
-        ResourceUnloader.set_idle(true);
+        ResourceUnloader.idle = true;
         if (clip == null)
         {
             throw new System.NullReferenceException();

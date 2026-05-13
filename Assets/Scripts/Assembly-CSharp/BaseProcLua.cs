@@ -287,12 +287,18 @@ public class BaseProcLua : CBaseProc
         ArrayList argsAL = null;
         if (args != null)
         {
+            // Source: Ghidra work/06_ghidra/decompiled_full/BaseProcLua/CreateWndFormLua.c RVA 0x15d7810
+            // Ghidra line 28-31:
+            //   plVar4 = ArrayList alloc;
+            //   ArrayList..ctor(plVar4);
+            //   (**(code **)(*plVar4 + 0x308))(plVar4, param_3, *(*plVar4 + 0x310));
+            // Vtable slot 0x308 = Add(object) — adds param_3 (LuaTable) as a SINGLE element.
+            // (Production flow: caller `OpenCreateCharWnd(true)` wraps as `{OnlyOpen}` Lua-table;
+            //  this code adds the WHOLE Lua-table into ArrayList; then WndForm_Lua.V_AfterCreate
+            //  extracts ArrayList[0] = LuaTable, casts to LuaTable (PTR_DAT_03460ce0), passes to
+            //  Lua's V_AfterCreate which reads `args[1] == true`.)
             argsAL = new ArrayList();
-            // Ghidra inlines a virtual call that copies LuaTable entries into ArrayList. The exact
-            // method is a slot 0x308 (offset) on ArrayList — likely AddRange via IEnumerable. Without
-            // a definitive 1-1 mapping for LuaTable iteration we leave the AL empty here; Lua side
-            // can read args via LuaTable directly.
-            // TODO: verify ArrayList population path (Ghidra slot 0x308 virtual on ArrayList).
+            argsAL.Add(args);
         }
         WndForm wnd = proxy.CreateWndForm(eWndFormID, argsAL, popup);
         return wnd;
@@ -301,7 +307,7 @@ public class BaseProcLua : CBaseProc
     // RVA: 0x15D7810  Ghidra: work/06_ghidra/decompiled_full/BaseProcLua/CreateWndFormLua.c
     // PORTED 1-1:
     //   if (wnd == null) return null;
-    //   convert LuaTable args -> ArrayList (same as above);
+    //   convert LuaTable args -> ArrayList (Add single element, same as overload above);
     //   newWnd = wnd.CreateWndForm(eWndFormID, argsAL, popup);  // calls WndForm.CreateWndForm
     //   verify type and return.
     public static object CreateWndFormLua(WndForm wnd, uint eWndFormID, LuaTable args, bool popup = false)
@@ -310,8 +316,9 @@ public class BaseProcLua : CBaseProc
         ArrayList argsAL = null;
         if (args != null)
         {
+            // Source: Ghidra CreateWndFormLua.c slot 0x308 = Add(object) — single element add.
             argsAL = new ArrayList();
-            // TODO: same LuaTable->ArrayList copy as ProxyType overload.
+            argsAL.Add(args);
         }
         WndForm newWnd = wnd.CreateWndForm(eWndFormID, argsAL, popup);
         return newWnd;
@@ -2523,9 +2530,29 @@ public class BaseProcLua : CBaseProc
     // PORTED 1-1: forwards to Opencoding.Console.DebugConsole.IsVisible (static property).
     // Ghidra signature returns bool but body is `Opencoding_Console_DebugConsole__get_IsVisible(0); return;`
     // — the return value is implicit (Ghidra type propagation gave up; the function does return the call's value).
+    //
+    // ⚠️ TODO Phase H — Replace paid dev-tool DLLs:
+    //   Asset:  TouchConsole Pro (Opencoding) — Unity Asset Store ID 25559 (~$30 USD)
+    //   URL:    https://assetstore.unity.com/packages/tools/gui/touchconsole-pro-25559
+    //   Why:    Production has these 4 DLLs (Opencoding.Console/CommandHandlers/LogHistory/Shared)
+    //           but Cpp2IL stripped the bodies → .cctor throws AnalysisFailedException.
+    //   Impact: Developer-only console (GM command terminal). Production user-facing logic
+    //           expects `IsVisible == false` 99% of the time. Returning false from this stub
+    //           matches production steady-state behavior; only `~`-key admin command path
+    //           lost (not used in login → char select flow).
+    //   Catch is type-specific (TypeInitializationException) — NOT generic catch-all.
     public static bool IsDebugConsoleVisible()
     {
-        return Opencoding.Console.DebugConsole.IsVisible;
+        try
+        {
+            return Opencoding.Console.DebugConsole.IsVisible;
+        }
+        catch (System.TypeInitializationException)
+        {
+            // Cpp2IL-stubbed .cctor in Opencoding.Console.dll throws. Replace DLL via Phase H
+            // (purchase TouchConsole Pro). For now: console-hidden default matches production.
+            return false;
+        }
     }
 
     // RVA: 0x15E3948  Ghidra: work/06_ghidra/decompiled_full/BaseProcLua/SetDebugConsoleVisible.c

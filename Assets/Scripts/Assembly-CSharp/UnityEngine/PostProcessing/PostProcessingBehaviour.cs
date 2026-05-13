@@ -82,8 +82,21 @@ namespace UnityEngine.PostProcessing
 		private void OnPostRender()
 		{ }
 
+		// Source: Unity PostProcessing v1 (open-source pre-URP package).
+		// Original implementation: applies the effect chain (bloom, vignette, DOF, etc.) from `profile`,
+		// then Graphics.Blit final result to destination. When profile==null OR no effects enabled,
+		// it does Graphics.Blit(source, destination) passthrough.
+		// Our Cpp2IL extract has empty body — Unity treats empty OnRenderImage as "didn't write",
+		// resulting in BLACK screen output. This breaks UI visibility regardless of Canvas state.
+		// 1-1 with passthrough semantics until full PostProcessing package replacement (Phase H paid/free SDK):
+		//   - Lua side (PostProcessMgr.lua) creates empty PostProcessingProfile by default
+		//   - With no enabled effects, the effect chain is no-op → just Blit
+		// This passthrough matches "no effects enabled" branch of the original Unity package.
+		// TODO: full port from Unity PostProcessing v1 GitHub source when needed for production builds.
 		private void OnRenderImage(RenderTexture source, RenderTexture destination)
-		{ }
+		{
+			Graphics.Blit(source, destination);
+		}
 
 		private void OnGUI()
 		{ }

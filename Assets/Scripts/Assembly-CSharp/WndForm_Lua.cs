@@ -51,15 +51,28 @@ public class WndForm_Lua : WndForm
     {
     }
 
-    // RVA: 0x18F591C  Ghidra: work/06_ghidra/decompiled_full/WndForm_Lua/.ctor.c — file missing in batch.
-    // Source: dump.cs TypeDefIndex 795 — public .ctor(uint eWndFormID). Stores eWndFormID + computes
-    // _sWndFormID via WndFormType lookup. Without Ghidra .c, store the id; sWndFormID assignment
-    // path is delegated to whoever calls (often Create()).
-    // TODO: confidence:medium — Ghidra .c file not present in decompiled_full/; assignment of _sWndFormID
-    // happens elsewhere in original; pending re-run of dump_must_port.py for 0x18F591C.
+    // Source: Ghidra work/06_ghidra/decompiled_full/WndForm_Lua/.ctor.c RVA 0x18F591C
+    // 1-1 body (from disassembly):
+    //   _sWndFormID = "";                                          // PTR_StringLiteral_0
+    //   base..ctor(1, 0);                                          // WndForm_ctor(this, 1, 0)
+    //   _eWndFormID = eWndFormID;                                  // *(this + 0x68) = param_2
+    //   args = new object[2];                                      // FUN_015cb754(PTR_DAT_03446590=object[], 2)
+    //   args[1] = (object)eWndFormID;                              // boxed via thunk_FUN_0155fe44(uint_type, &local_34)
+    //   result = Util.CallMethod<object>("EWndFormID"[4925], "GetWndformName"[6104], args, typeof(string));
+    //   if (result != null) _sWndFormID = (string)result;          // *plVar8 = lVar5
+    // String literals: 4925="EWndFormID" (Lua class name), 6104="GetWndformName" (Lua method).
     public WndForm_Lua(uint eWndFormID) : base()
     {
+        _sWndFormID = "";
         _eWndFormID = eWndFormID;
+        // args[0] = null, args[1] = boxed eWndFormID (production layout per Ghidra plVar4[5] = lVar5).
+        object[] args = new object[2];
+        args[1] = (object)eWndFormID;
+        object result = LuaFramework.Util.CallMethod<object>("EWndFormID", "GetWndformName", args);
+        if (result != null)
+        {
+            _sWndFormID = (string)result;
+        }
     }
 
     // RVA: 0x18F5A94  Ghidra: work/06_ghidra/decompiled_full/WndForm_Lua/CreateLuaWnd.c
@@ -68,11 +81,12 @@ public class WndForm_Lua : WndForm
     // String literals: 12605="WndForm", 6609="Instance", 10193="SetWndFormC", 6569="InitTables".
     public bool CreateLuaWnd()
     {
-        // Ghidra: _LuaClass = Util.CallMethod<LuaTable>(_sWndFormID, "Instance",
-        //   **(undefined8**)(WndForm_Lua_klass_static_fields + 0xb8) /* empty args[] singleton */,
-        //   PTR_DAT_03449450 /* typeof(LuaTable) */);
-        // The +0xb8 deref reads the static empty object[] singleton — equivalent to new object[0].
-        _LuaClass = LuaFramework.Util.CallMethod<LuaTable>(_sWndFormID, "Instance", new object[0]);
+        // Ghidra 1-1: Util.CallMethod<object>(_sWndFormID, "Instance", emptyArgs, typeof(LuaTable))
+        // — production uses <object> not <LuaTable>. Same fix pattern as BaseProcLua.CreateLuaProc
+        // (CallMethod<R> generic strict-cast returns default(R) on Lua-side type mismatch;
+        // <object> preserves the lua table reference, then explicit `as LuaTable` cast resolves it).
+        object result = LuaFramework.Util.CallMethod<object>(_sWndFormID, "Instance", new object[0]);
+        _LuaClass = result as LuaTable;
         if (_LuaClass == null)
         {
             return false;
@@ -98,19 +112,23 @@ public class WndForm_Lua : WndForm
     }
 
     // RVA: 0x18F5E28  Ghidra: work/06_ghidra/decompiled_full/WndForm_Lua/V_Create.c
-    // 1-1 from Ghidra: calls _sWndFormID.V_Create(_LuaClass, firstArg<WndForm_Lua?>) → int (1 == true).
-    // If returned true, calls "ProcessBase":"CheckHideMainUI" on Main.Instance LuaState.
+    // 1-1 from Ghidra: extract args[0] as LuaTable (castclass at PTR_DAT_03460ce0 = LuaTable),
+    // call _sWndFormID.V_Create(_LuaClass, luaTableArg) → int (1 == true).
+    // If returned true, calls "ProcessBase":"CheckHideMainUI" with empty args.
     // String literals: 12403="V_Create", 4034="CheckHideMainUI", 9214="ProcessBase".
+    // PTR_DAT_03460ce0 identified as LuaInterface.LuaTable (cross-referenced from LuaState.PushLuaTable).
     protected override bool V_Create(ArrayList args)
     {
-        // Extract args[0] if it's a WndForm_Lua (matches Ghidra typed-cast at 0x019f5fdc).
-        WndForm_Lua arg0 = null;
+        // Source: Ghidra V_Create.c lines 30-48 — only extract args[0] if args.Count==1, castclass to LuaTable.
+        LuaTable arg0 = null;
         if (args != null && args.Count == 1)
         {
             object o = args[0];
-            if (o is WndForm_Lua)
+            if (o != null)
             {
-                arg0 = (WndForm_Lua)o;
+                // Ghidra: FUN_015cbc7c() (invalid cast throw) if o is not LuaTable.
+                arg0 = o as LuaTable;
+                if (arg0 == null) throw new System.InvalidCastException("WndForm_Lua.V_Create: args[0] must be LuaTable, got " + o.GetType().Name);
             }
         }
         int rc = LuaFramework.Util.CallMethod<int>(_sWndFormID, "V_Create", new object[] { _LuaClass, arg0 });
@@ -126,19 +144,22 @@ public class WndForm_Lua : WndForm
     }
 
     // RVA: 0x18F6080  Ghidra: work/06_ghidra/decompiled_full/WndForm_Lua/V_AfterCreate.c
-    // 1-1 from Ghidra: Util.CallMethod(_sWndFormID, "V_AfterCreate", [_LuaClass, arg0])
+    // 1-1 from Ghidra: Util.CallMethod(_sWndFormID, "V_AfterCreate", [_LuaClass, luaTableArg])
     // Then Util.CallMethod<bool>("ProcessBase", "NeedUnloadUnusedAssetsAfterCreateWndFrom", [this])
     // If true → ResourceUnloader.DoUnloadNow(false). String literals: 12402="V_AfterCreate",
     // 8327="NeedUnloadUnusedAssetsAfterCreateWndFrom", 9214="ProcessBase".
+    // Cast target PTR_DAT_03460ce0 = LuaTable (same as V_Create).
     protected override void V_AfterCreate(ArrayList args)
     {
-        WndForm_Lua arg0 = null;
+        // Source: Ghidra V_AfterCreate.c lines 30-48 — castclass args[0] to LuaTable.
+        LuaTable arg0 = null;
         if (args != null && args.Count == 1)
         {
             object o = args[0];
-            if (o is WndForm_Lua)
+            if (o != null)
             {
-                arg0 = (WndForm_Lua)o;
+                arg0 = o as LuaTable;
+                if (arg0 == null) throw new System.InvalidCastException("WndForm_Lua.V_AfterCreate: args[0] must be LuaTable, got " + o.GetType().Name);
             }
         }
         LuaFramework.Util.CallMethod(_sWndFormID, "V_AfterCreate", new object[] { _LuaClass, arg0 });
@@ -207,13 +228,31 @@ public class WndForm_Lua : WndForm
     //                  12615="WndPropertyData".
     public bool WndPropertyData(WndProperty.EAct act, string name, int index, object obj, bool clear)
     {
+        // PHASE B DIAG — TODO: remove after _jobBtnGroup fix verified
+        // Use Unity-aware null check (uo != null handles destroyed Unity.Object — uo.name on destroyed throws NRE)
+        string objStr;
+        if (obj == null) objStr = "<null>";
+        else if (obj is UnityEngine.Object uo)
+        {
+            objStr = (uo != null) ? uo.GetType().Name + ":" + uo.name : uo.GetType().Name + ":<destroyed>";
+        }
+        else objStr = obj.GetType().Name;
+        string luaClassStr = (_LuaClass == null) ? "<NULL>" : "table";
+        UnityEngine.Debug.Log($"[WndForm_Lua.WndPropertyData] sWndFormID='{_sWndFormID}' _LuaClass={luaClassStr} act={act} name='{name}' idx={index} obj={objStr} clear={clear}");
+
         if (act != WndProperty.EAct.Field_Set)
         {
             UJDebug.LogWarning("WndForm_Lua:WndProperty Only Support WndProperty.EAct.Field_Set");
             return true;
         }
-        int rc = LuaFramework.Util.CallMethod<int>(_sWndFormID, "WndPropertyData",
+        // Source: Ghidra work/06_ghidra/decompiled_full/WndForm_Lua/WndPropertyData.c RVA 0x18f6a18
+        // Ghidra calls CallMethod<int>(PTR_StringLiteral_12605="WndForm", PTR_StringLiteral_12615="WndPropertyData", args)
+        // — module is the LITERAL "WndForm" (base class name), NOT _sWndFormID.
+        // String literal idx 12605: "WndForm" (verified in stringliteral.json).
+        // Lua dispatch: WndForm.WndPropertyData(_LuaClass, name, index, obj, clear) — directly to base class.
+        int rc = LuaFramework.Util.CallMethod<int>("WndForm", "WndPropertyData",
             new object[] { _LuaClass, name, index, obj, clear });
+        UnityEngine.Debug.Log($"[WndForm_Lua.WndPropertyData]   → Lua returned rc={rc}");
         return rc == 1;
     }
 

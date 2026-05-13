@@ -383,8 +383,13 @@ public class WndForm : IWndForm
      *     behavior matches the binary. */
     public void AfterCreate(ArrayList args)
     {
+        string cgEntry = (_node != null && _node._canvasGroup != null) ? _node._canvasGroup.alpha.ToString() : "<null>";
+        Debug.Log("[WndForm.AfterCreate] ENTRY eID=" + _wID + " type=" + this.GetType().Name + " curAlpha=" + _curAlpha + " CG.alpha=" + cgEntry);
         V_AfterCreate(args);
+        Debug.Log("[WndForm.AfterCreate] after V_AfterCreate eID=" + _wID + " curAlpha=" + _curAlpha);
         CheckWaitCreateSubWnd();
+        string cgAfter = (_node != null && _node._canvasGroup != null) ? _node._canvasGroup.alpha.ToString() : "<null>";
+        Debug.Log("[WndForm.AfterCreate] after CheckWaitCreateSubWnd eID=" + _wID + " curAlpha=" + _curAlpha + " flagDone=" + ((_wFlag & FLAG_DONE) != 0) + " CG.alpha=" + cgAfter);
     }
 
     /* RVA 0x01a0641c — UpdateOrder(ref int depth):
@@ -580,7 +585,8 @@ public class WndForm : IWndForm
      */
     public bool Create(uint eWndFormID, WndForm parent, WndFormNode node, ArrayList args)
     {
-        if ((_wFlag & FLAG_DESTROY) != 0) return false;
+        Debug.Log($"[WndForm.Create] ENTRY eID={eWndFormID} type={this.GetType().Name} flagDestroy={(_wFlag & FLAG_DESTROY)!=0}");
+        if ((_wFlag & FLAG_DESTROY) != 0) { Debug.LogError($"[WndForm.Create] FLAG_DESTROY set, bail eID={eWndFormID}"); return false; }
         if (!_activeForms.Contains(this)) _activeForms.Add(this);
         _wID = eWndFormID;
         _parent = parent;
@@ -590,7 +596,9 @@ public class WndForm : IWndForm
         if (node._canvas == null) throw new NullReferenceException();
         node._canvas.overrideSorting = true;
         var go = node._canvas.gameObject;
+        Debug.Log($"[WndForm.Create] before InitComponents eID={eWndFormID} go={go.name} popup={node._popup}");
         InitComponents(go, this);
+        Debug.Log($"[WndForm.Create] after InitComponents, before V_Create eID={eWndFormID}");
         bool ok;
         try { ok = V_Create(args); }
         catch (System.Exception e)
@@ -598,6 +606,8 @@ public class WndForm : IWndForm
             Debug.LogError("[WndForm.Create] V_Create exception: " + e);
             ok = false;
         }
+        string cgAfterCreate = (node._canvasGroup != null) ? node._canvasGroup.alpha.ToString() : "<null>";
+        Debug.Log("[WndForm.Create] V_Create returned ok=" + ok + " eID=" + eWndFormID + " curAlpha=" + _curAlpha + " CG.alpha=" + cgAfterCreate);
         if (ok)
         {
             _focusWndForm = this;
@@ -632,12 +642,14 @@ public class WndForm : IWndForm
         {
             if (_waitForEnter)
             {
-                _node._animator.SetTrigger("Show");
+                // Source: Ghidra WndForm/SetShow.c — PTR_StringLiteral_5045 = "Enter" (em port lần đầu SAI "Show").
+                _node._animator.SetTrigger("Enter");
                 _waitForEnter = false;
             }
             if (_waitForExit)
             {
-                _node._animator.SetTrigger("Hide");
+                // Source: Ghidra WndForm/SetShow.c — PTR_StringLiteral_5204 = "Exit" (em port lần đầu SAI "Hide").
+                _node._animator.SetTrigger("Exit");
                 _waitForExit = false;
             }
         }
@@ -680,8 +692,9 @@ public class WndForm : IWndForm
                 if (anim.isInitialized)
                 {
                     var info = anim.GetCurrentAnimatorStateInfo(0);
-                    // PTR_StringLiteral_5205 == "Hide", PTR_StringLiteral_5204 == "Show"
-                    if (info.IsName("Hide"))
+                    // Source: Ghidra WndForm/Update.c — puVar3=PTR_StringLiteral_5205="Exit_Anim", puVar2=PTR_StringLiteral_5204="Exit".
+                    // (Em port lần đầu SAI: assume "Hide"/"Show" — chế cháo. Ghidra dùng "Exit_Anim"/"Exit".)
+                    if (info.IsName("Exit_Anim"))
                     {
                         var info2 = anim.GetCurrentAnimatorStateInfo(0);
                         if (info2.normalizedTime >= 1.0f)
@@ -694,7 +707,7 @@ public class WndForm : IWndForm
                     }
                     else
                     {
-                        anim.SetTrigger("Show");
+                        anim.SetTrigger("Exit");
                     }
                 }
             }
@@ -902,7 +915,8 @@ public class WndForm : IWndForm
             }
             else
             {
-                anim.SetTrigger(b ? "Show" : "Hide");
+                // Source: Ghidra WndForm/SetShow.c — show=true → "Enter" (5045), show=false → "Exit" (5204).
+                anim.SetTrigger(b ? "Enter" : "Exit");
             }
         }
 

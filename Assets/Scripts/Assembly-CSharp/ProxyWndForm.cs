@@ -57,6 +57,7 @@ public class ProxyWndForm : IWndForm
     //   8. co = new UJCoroutine(iter); LuaManager.Instance.StartCoroutine(co); return wndForm
     public WndForm CreateWndForm(uint eWndFormID, ArrayList args, bool popup = false)
     {
+        UnityEngine.Debug.Log($"[ProxyWndForm.CreateWndForm] ENTRY eID={eWndFormID} proxyName={_name} popup={popup}");
         // Ghidra: if (_root == null) → LogWarning + return null
         if (_root == null)
         {
@@ -72,21 +73,25 @@ public class ProxyWndForm : IWndForm
             UJDebug.LogWarning("ProxyWndForm.CreateWndForm: factory returned null, wid=" + eWndFormID.ToString() + " name=" + _name);
             return null;
         }
+        UnityEngine.Debug.Log($"[ProxyWndForm.CreateWndForm] factory returned wndForm type={wndForm.GetType().Name} for eID={eWndFormID}");
 
         // Ghidra: prefabPath = wndForm.GetPrefab(eWndFormID, args)  via vtable slot 0x1c8
         string prefabPath = wndForm.GetPrefab(eWndFormID, args);
-        if (string.IsNullOrEmpty(prefabPath)) return null;
+        UnityEngine.Debug.Log($"[ProxyWndForm.CreateWndForm] prefabPath='{prefabPath}' for eID={eWndFormID}");
+        if (string.IsNullOrEmpty(prefabPath)) { UnityEngine.Debug.LogError($"[ProxyWndForm.CreateWndForm] prefabPath empty for eID={eWndFormID}"); return null; }
 
         WndRoot.showMask = true;
 
         string bundleName;
         string objName;
         wndForm.GetBundle(eWndFormID, args, out bundleName, out objName);
+        UnityEngine.Debug.Log($"[ProxyWndForm.CreateWndForm] bundleName='{bundleName}' objName='{objName}' for eID={eWndFormID}");
 
         var creator = new AsyncWndFormCreator(prefabPath, this, wndForm, eWndFormID, args, objName, popup);
 
         // Ghidra: cached = AsyncWndFormCreator.FindCache(prefabPath)
         GameObject cached = AsyncWndFormCreator.FindCache(prefabPath);
+        UnityEngine.Debug.Log($"[ProxyWndForm.CreateWndForm] cached.null={cached==null} isPrefabInResource={wndForm.IsPrefabInResource()} for eID={eWndFormID}");
 
         IEnumerator iter = null;
         if (cached != null)
@@ -174,10 +179,13 @@ public class ProxyWndForm : IWndForm
     //         wnd.AfterCreate(args)
     void IWndForm.CreateWndFormAsync(WndForm wnd, GameObject resObj, uint eWndFormID, ArrayList args, bool popup)
     {
+        string resObjName = (resObj != null) ? resObj.name : "<null>";
+        UnityEngine.Debug.Log($"[ProxyWndForm.CreateWndFormAsync] ENTRY eID={eWndFormID} wndType={wnd?.GetType()?.Name} resObj={resObjName} popup={popup}");
         if (wnd == null) throw new System.NullReferenceException("ProxyWndForm.CreateWndFormAsync: wnd null");
 
         if (wnd.isDestroy)
         {
+            UnityEngine.Debug.LogError($"[ProxyWndForm.CreateWndFormAsync] wnd.isDestroy=true for eID={eWndFormID} — bail");
             wnd.Destroy();
             return;
         }
@@ -188,7 +196,11 @@ public class ProxyWndForm : IWndForm
         UJDebug.LogTrace("ProxyWndForm.CreateWndFormAsync: " + resObj.name);
 
         WndFormNode node = WndFormNode.Create(eWndFormID, resObj);
-        if (node == null) return;
+        if (node == null)
+        {
+            UnityEngine.Debug.LogError($"[ProxyWndForm.CreateWndFormAsync] WndFormNode.Create returned null for eID={eWndFormID} resObj={resObj.name}");
+            return;
+        }
 
         Canvas nodeCanvas = node._canvas;
         if (nodeCanvas == null) throw new System.NullReferenceException("ProxyWndForm.CreateWndFormAsync: node._canvas null");
@@ -416,11 +428,16 @@ public class ProxyWndForm : IWndForm
                 }
                 else
                 {
-                    // Source: StringLit_5204 = "Show", StringLit_5205 = "Hide" (matched against WndForm.cs static Update body).
+                    // Source: Ghidra WndForm/Update.c (RVA 0x01a070bc) — verified via stringliteral.json:
+                    //   PTR_StringLiteral_5204 = "Exit"      (SetTrigger arg)
+                    //   PTR_StringLiteral_5205 = "Exit_Anim" (IsName arg)
+                    // Em port lần đầu SAI: assume "Show"/"Hide" — chế cháo, không lookup stringliteral.
+                    // Hậu quả: khi destroy được yêu cầu, SetTrigger("Show") khiến animator quay LẠI Enter state
+                    // thay vì transition Exit → WndForm không bao giờ destroy → cover màn login → đen.
                     var info = node._animator.GetCurrentAnimatorStateInfo(0);
-                    if (!info.IsName("Hide"))
+                    if (!info.IsName("Exit_Anim"))
                     {
-                        node._animator.SetTrigger("Show");
+                        node._animator.SetTrigger("Exit");
                     }
                     else
                     {

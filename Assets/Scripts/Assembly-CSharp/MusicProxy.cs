@@ -43,50 +43,46 @@ public sealed class MusicProxy : MonoBehaviour
     private string _musicName;                          // 0x80
     private string _preMusicName;                       // 0x88
 
-    // Source: Ghidra work/06_ghidra/decompiled_full/MusicProxy/get_main.c  RVA 0x017BE260
-    // Body: return s_main; (read of static field at offset 0x10 in static struct)
-    public static MusicProxy get_main()
-    {
-        return s_main;
-    }
+    // Source: dump.cs TypeDefIndex 145 lines 7266-7273. Production declares BOTH the property
+    // and the explicit getter method (IL2Cpp keeps them as two metadata entries). In C#
+    // surface syntax we can express only one — using the property form because Lua needs
+    // it visible as `MusicProxy.main` (RegVar) per AudioManager:112 / SetMusicVolume.
+    // The C# auto-generated `get_main()` accessor underneath the property is semantically
+    // identical to dump.cs's `public static MusicProxy get_main()` at RVA 0x017BE260.
+    public static MusicProxy main { get { return s_main; } }
 
-    // Source: Ghidra work/06_ghidra/decompiled_full/MusicProxy/get_masterVolume.c  RVA 0x017BE2B8
-    // If !s_loaded: s_loaded=true; s_masterVolume = PlayerPrefs.GetFloat("MusicVolume",0);
-    //   clamp <0 -> 0; >1 -> 1.  Then return s_masterVolume.
-    public static float get_masterVolume()
+    // Source: dump.cs `public static float masterVolume { get; set; }` + explicit get/set methods.
+    // Express as property in C#; auto-gen accessors functionally identical to dump's RVA
+    // 0x017BE2B8 (getter) + 0x017BE3D8 (setter). Lua `MusicProxy.main.masterVolume = X` needs property form.
+    public static float masterVolume
     {
-        if (!s_loaded)
+        // get: Ghidra get_masterVolume.c RVA 0x017BE2B8
+        // If !s_loaded: s_loaded=true; s_masterVolume = PlayerPrefs.GetFloat("MusicVolume",0);
+        //   clamp <0 -> 0; >1 -> 1.  Then return s_masterVolume.
+        get
         {
-            s_loaded = true;
-            s_masterVolume = PlayerPrefs.GetFloat(CPrefKey_MusicVolume, 0f);
-            if (s_masterVolume < 0f)
+            if (!s_loaded)
             {
-                s_masterVolume = 0f;
+                s_loaded = true;
+                s_masterVolume = PlayerPrefs.GetFloat(CPrefKey_MusicVolume, 0f);
+                if (s_masterVolume < 0f) s_masterVolume = 0f;
+                if (s_masterVolume > 1f) s_masterVolume = 1f;
             }
-            if (s_masterVolume > 1f)
-            {
-                s_masterVolume = 1f;
-            }
+            return s_masterVolume;
         }
-        return s_masterVolume;
-    }
-
-    // Source: Ghidra work/06_ghidra/decompiled_full/MusicProxy/set_masterVolume.c  RVA 0x017BE3D8
-    // Clamps value to [0,1]; if changed, writes back to s_masterVolume, sets s_loaded=true,
-    // PlayerPrefs.SetFloat("MusicVolume", v), and increments s_volumeMask.
-    public static void set_masterVolume(float value)
-    {
-        // The Ghidra code: fVar6 = (s_masterVolume >= 0) ? value : 0;
-        //                  fVar7 = (s_masterVolume <= 1) ? fVar6 : 1;
-        //                  if (s_masterVolume != fVar7) { ...write... }
-        float fVar6 = (s_masterVolume >= 0f) ? value : 0f;
-        float fVar7 = (s_masterVolume <= 1f) ? fVar6 : 1f;
-        if (s_masterVolume != fVar7)
+        // set: Ghidra set_masterVolume.c RVA 0x017BE3D8
+        // Clamps to [0,1]; if changed write to s_masterVolume + s_loaded=true + PlayerPrefs.SetFloat + s_volumeMask++.
+        set
         {
-            s_masterVolume = fVar7;
-            s_loaded = true;
-            PlayerPrefs.SetFloat(CPrefKey_MusicVolume, fVar7);
-            s_volumeMask = s_volumeMask + 1;
+            float fVar6 = (s_masterVolume >= 0f) ? value : 0f;
+            float fVar7 = (s_masterVolume <= 1f) ? fVar6 : 1f;
+            if (s_masterVolume != fVar7)
+            {
+                s_masterVolume = fVar7;
+                s_loaded = true;
+                PlayerPrefs.SetFloat(CPrefKey_MusicVolume, fVar7);
+                s_volumeMask = s_volumeMask + 1;
+            }
         }
     }
 
@@ -158,7 +154,7 @@ public sealed class MusicProxy : MonoBehaviour
             }
             else
             {
-                SetVolume((get_masterVolume() * _volume * _fadeTime) / _fadeIntervalOut);
+                SetVolume((masterVolume * _volume * _fadeTime) / _fadeIntervalOut);
             }
         }
 
@@ -177,7 +173,7 @@ public sealed class MusicProxy : MonoBehaviour
                 if (_fadeIntervalIn <= 0f)
                 {
                     _volumeMask = s_volumeMask;
-                    v = get_masterVolume() * _volume;
+                    v = masterVolume * _volume;
                 }
                 else
                 {
@@ -201,11 +197,11 @@ public sealed class MusicProxy : MonoBehaviour
             if (_fadeTime >= _fadeIntervalIn)
             {
                 _fadeMode = 0;
-                v2 = get_masterVolume() * _volume;
+                v2 = masterVolume * _volume;
             }
             else
             {
-                v2 = (get_masterVolume() * _volume * _fadeTime) / _fadeIntervalIn;
+                v2 = (masterVolume * _volume * _fadeTime) / _fadeIntervalIn;
             }
             SetVolume(v2);
         }
@@ -214,7 +210,7 @@ public sealed class MusicProxy : MonoBehaviour
         if (_volumeMask != s_volumeMask)
         {
             _volumeMask = s_volumeMask;
-            SetVolume(_volume * get_masterVolume());
+            SetVolume(_volume * masterVolume);
         }
     }
 

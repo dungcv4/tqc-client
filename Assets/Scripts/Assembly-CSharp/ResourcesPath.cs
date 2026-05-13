@@ -30,13 +30,23 @@ public class ResourcesPath
     {
         get
         {
+#if UNITY_EDITOR
+            // EDITOR TOGGLE: route all CDN fetches (PatchHostList.xml, serverlist.xml, AssetBundles)
+            // to local mock_server.py (TCP 8888) so we can:
+            //   - serve locally-edited serverlist.xml (mock TCP login server at 127.0.0.1:10232)
+            //   - intercept asset downloads, use CdnCache/ for replay
+            // Production build (non-Editor) uses the original hardcoded CDN — gốc 1-1 preserved.
+            // Mock_server fallback proxies to remote CDN if local cache miss.
+            // See feedback_editor_toggles.md — Editor-only test toggle, safe default.
+            return "http://127.0.0.1:8888/official/";
+#else
             if (string.IsNullOrEmpty(_patchHost))
             {
-                // TODO: confirm literal #17191 value via stringliteral.json — Ghidra pseudo not fully decoded.
                 _patchHost = STR_17191;
             }
             string android = PatchHostAndroid;
             return string.IsNullOrEmpty(android) ? _patchHost : android;
+#endif
         }
         set
         {

@@ -33,6 +33,10 @@ public static class LuaBinder
 		GameProcMgrWrap.Register(L);
 		GradientTextWrap.Register(L);
 		IWndComponentWrap.Register(L);
+		// HAND-WRITTEN wraps for WndProperty + WndSubProperty (auto-gen blocked by Spine.Unity.SpineSkin).
+		// Lua needs typeof(WndProperty) / typeof(WndSubProperty) for GetComponent<T> calls in WndForm_LoginGame.
+		WndPropertyWrap.Register(L);
+		WndSubPropertyWrap.Register(L);
 		IconTextureMgrWrap.Register(L);
 		ImageViewerWrap.Register(L);
 		InfiniteVerticalScrollWrap.Register(L);
@@ -74,6 +78,8 @@ public static class LuaBinder
 		UVAnimationWrap.Register(L);
 		WndClickMethodWrap.Register(L);
 		WndFormWrap.Register(L);
+		WndForm_LoadingScreenWrap.Register(L);
+		WndForm_LuaWrap.Register(L);
 		WndParticleWrap.Register(L);
 		WndRootWrap.Register(L);
 		WrdFileMgrWrap.Register(L);
@@ -153,11 +159,16 @@ public static class LuaBinder
 		UnityEngine_TrailRendererWrap.Register(L);
 		UnityEngine_TransformWrap.Register(L);
 		UnityEngine_WrapModeWrap.Register(L);
+		// HAND-WRITTEN wrap (Spine.Unity.SpineSkin breaks broader regen).
+		// Lua WndForm_MsgWindow:54+ uses UnityEngine.TextAnchor.IntToEnum(...) for Text.alignment.
+		UnityEngine_TextAnchorWrap.Register(L);
 		UnityEngine_MonoBehaviourWrap.Register(L);
 		UnityEngine_BehaviourWrap.Register(L);
 		UnityEngine_ComponentWrap.Register(L);
 		UnityEngine_TrackedReferenceWrap.Register(L);
 		UnityEngine_ColliderWrap.Register(L);
+		// dump.cs TypeDefIndex 566 — hand-written wrap (Spine.Unity.SpineSkin breaks auto-gen).
+		UnityEngine_ScriptableObjectWrap.Register(L);
 		L.BeginModule("EventSystems");
 		UnityEngine_EventSystems_EventSystemWrap.Register(L);
 		UnityEngine_EventSystems_PointerEventDataWrap.Register(L);
@@ -193,6 +204,21 @@ public static class LuaBinder
 		UnityEngine_UI_HorizontalOrVerticalLayoutGroupWrap.Register(L);
 		L.BeginModule("InputField");
 		L.RegFunction("OnValidateInput", UnityEngine_UI_InputField_OnValidateInput);
+		L.EndModule();
+		L.EndModule();
+		// PostProcessing namespace — hand-written wraps (PostProcessingWraps.cs). 1-1 with
+		// dump.cs production wraps; ToLuaMenu auto-gen crashes on Spine.Unity.SpineSkin attribute.
+		L.BeginModule("PostProcessing");
+		UnityEngine_PostProcessing_PostProcessingBehaviourWrap.Register(L);
+		UnityEngine_PostProcessing_PostProcessingProfileWrap.Register(L);
+		UnityEngine_PostProcessing_PostProcessingModelWrap.Register(L);
+		UnityEngine_PostProcessing_VignetteModelWrap.Register(L);
+		UnityEngine_PostProcessing_DepthOfFieldModelWrap.Register(L);
+		L.BeginModule("VignetteModel");
+		UnityEngine_PostProcessing_VignetteModel_SettingsWrap.Register(L);
+		L.EndModule();
+		L.BeginModule("DepthOfFieldModel");
+		UnityEngine_PostProcessing_DepthOfFieldModel_SettingsWrap.Register(L);
 		L.EndModule();
 		L.EndModule();
 		L.BeginModule("Events");
