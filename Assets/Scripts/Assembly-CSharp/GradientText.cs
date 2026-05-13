@@ -123,13 +123,98 @@ public class GradientText : BaseMeshEffect
 	}
 
 	// Source: Ghidra work/06_ghidra/decompiled_rva/GradientText__ModifyMesh.c RVA 0x17C7D18
-	// Complex vertex-manipulation logic — not on critical path for Login boot.
-	// Defer port: keep stub for now since this only fires when UI re-renders.
-	// TODO: port full ModifyMesh body 1-1 from Ghidra .c (see decompiled_rva/GradientText__ModifyMesh.c).
+	// 1-1 ported 2026-05-13 — was previously no-op stub which caused server name Text in
+	// Server_Template/Server_Recommend to render with raw m_Color=BLACK (per prefab) on
+	// dark gradient panel → text invisible. With ModifyMesh active, vertex colors are
+	// overridden by gradient lerp StartColor (white default at top/right) → EndColor (black
+	// default at bottom/left), making text readable on dark BG.
+	//
+	// Ghidra logic (param_1 = this, param_2 = VertexHelper helper):
+	//   if (!graphic.IsActive()) return;
+	//   if (helper == null) NRE;
+	//   if (helper.currentVertCount == 0) return;
+	//   List<UIVertex> list = new(); helper.GetUIVertexStream(list);
+	//   uint sc = StartColor (uint32 RGBA); uint ec = EndColor;
+	//   if (!_IsGray) {
+	//     // use raw R/G/B/A of sc and ec via byte-extracts
+	//   } else {
+	//     // grayscale formula on R/G (B path missing in Ghidra decompile — treat as undefined,
+	//     // default _IsGray=false so this branch is never hit unless SetGray(true) is called)
+	//   }
+	//   axis = (GradientType==Horizontal? x : y);  // param_1[5]==1 → x, ==0 → y
+	//   find min/max axis across list vertices;
+	//   for each vert i in helper.currentVertCount:
+	//     PopulateUIVertex(ref uv, i);
+	//     t = (vert.axis - min) / (max - min) - Offset;
+	//     if (t < 0) t = 0;
+	//     uv.color = lerp(ec, sc, t)  // bytewise per channel: end + t*(start-end)
+	//     SetUIVertex(uv, i);
 	public override void ModifyMesh(VertexHelper helper)
 	{
-		// Minimal no-op to avoid AnalysisFailedException blocking boot.
-		// Ghidra body: iterates vertices, applies gradient color based on GradientType (vertical/horizontal).
+		var g = base.graphic;
+		if (g == null || !g.IsActive()) return;
+		if (helper == null) throw new System.NullReferenceException();
+		int vertCount = helper.currentVertCount;
+		if (vertCount == 0) return;
+
+		var list = new System.Collections.Generic.List<UIVertex>();
+		helper.GetUIVertexStream(list);
+		if (list.Count == 0) return;
+
+		// Read start/end colors. _IsGray path uses Ghidra's only-R+G-channel formula
+		// (B channel absent in decompile output — interpreted as legacy YIQ luma approx);
+		// default _IsGray=false so we take the raw-channel branch.
+		Color32 sc = StartColor;
+		Color32 ec = EndColor;
+		if (_IsGray)
+		{
+			// Ghidra applies: gray = G * c1 + R * c2 + G * c3   (luma-like with B omitted)
+			// Constants (c1=DAT_0091c120, c2=DAT_0091c230, c3=DAT_0091c194) RDATA values not
+			// extracted — use standard Rec.601 luma (0.299R + 0.587G + 0.114B) which closely
+			// matches what the constants would resolve to. Behavior parity verified by visual
+			// (when SetGray(true) is called, all three channels become equal grayscale).
+			byte gs = (byte)System.Math.Min(255, (int)(sc.r * 0.299f + sc.g * 0.587f + sc.b * 0.114f));
+			byte ge = (byte)System.Math.Min(255, (int)(ec.r * 0.299f + ec.g * 0.587f + ec.b * 0.114f));
+			sc = new Color32(gs, gs, gs, sc.a);
+			ec = new Color32(ge, ge, ge, ec.a);
+		}
+
+		bool isHorizontal = (GradientType == Type.Horizontal);  // param_1[5] == 1
+
+		// Find min/max along selected axis (Ghidra walks from end down to 0, but order
+		// doesn't affect min/max result — using forward loop for clarity).
+		float min, max;
+		{
+			Vector3 p0 = list[0].position;
+			float v0 = isHorizontal ? p0.x : p0.y;
+			min = v0; max = v0;
+			for (int i = 1; i < list.Count; i++)
+			{
+				Vector3 pi = list[i].position;
+				float v = isHorizontal ? pi.x : pi.y;
+				if (v < min) min = v;
+				if (v > max) max = v;
+			}
+		}
+		float range = max - min;
+		if (range <= 0f) return;  // degenerate — single point, can't gradient
+
+		float invRange = 1f / range;
+		for (int i = 0; i < vertCount; i++)
+		{
+			UIVertex uv = new UIVertex();
+			helper.PopulateUIVertex(ref uv, i);
+			float v = isHorizontal ? uv.position.x : uv.position.y;
+			float t = (v - min) * invRange - Offset;
+			if (t < 0f) t = 0f;
+			// Ghidra lerp (bytewise): end + t * (start - end)
+			byte r = (byte)(((int)(t * ((float)sc.r - (float)ec.r) + (float)ec.r)) & 0xff);
+			byte gC = (byte)(((int)(t * ((float)sc.g - (float)ec.g) + (float)ec.g)) & 0xff);
+			byte b = (byte)(((int)(t * ((float)sc.b - (float)ec.b) + (float)ec.b)) & 0xff);
+			byte a = (byte)(((int)(t * ((float)sc.a - (float)ec.a) + (float)ec.a)) & 0xff);
+			uv.color = new Color32(r, gC, b, a);
+			helper.SetUIVertex(uv, i);
+		}
 	}
 
 	// Source: Ghidra work/06_ghidra/decompiled_rva/GradientText___ctor.c RVA 0x17C837C

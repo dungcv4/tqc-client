@@ -260,6 +260,18 @@ public class WndForm_Lua : WndForm
     // 1-1 from Ghidra: Util.CallMethod2(_sWndFormID, sLuaMethod, new object[]{_LuaClass, btn, data, (int)action, intValue, strValue}).
     public void BtnClick_CallBack(string sLuaMethod, Component btn, PointerEventData data, Action_Type action, int intValue, string strValue)
     {
+        // DIAG 2026-05-13 — trace which Lua method gets fired per button click so we can see
+        // if user is hitting _OnConnectClick (outer), _OnSwitchBtnClick (inner), or
+        // _OnLoginWndAreaClick (background) etc.
+        string btnPath = "<null>";
+        if (btn != null && btn.gameObject != null)
+        {
+            var sb = new System.Text.StringBuilder(btn.gameObject.name);
+            var t = btn.gameObject.transform.parent;
+            while (t != null && sb.Length < 200) { sb.Insert(0, t.name + "/"); t = t.parent; }
+            btnPath = sb.ToString();
+        }
+        UnityEngine.Debug.Log($"[DIAG BtnClick_CallBack] wnd='{_sWndFormID}' method='{sLuaMethod}' btn='{btnPath}'");
         LuaFramework.Util.CallMethod2(_sWndFormID, sLuaMethod,
             new object[] { _LuaClass, btn, data, (int)action, intValue, strValue });
     }

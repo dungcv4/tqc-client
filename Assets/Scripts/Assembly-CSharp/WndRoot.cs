@@ -184,8 +184,66 @@ public class WndRoot : MonoBehaviour
         }
     }
     public static void Update(float dTime) { }
-    private void Awake() { }
-    private static void InitGUI(GameObject gObj, bool isEditor = false) { }
+
+    // Source: Ghidra work/06_ghidra/decompiled_full/WndRoot/Awake.c RVA 0x01a0acc8
+    // 1-1:
+    //   var go = this.gameObject;
+    //   UnityEngine.Object.DontDestroyOnLoad(go);
+    //   WndRoot.InitGUI(go, false);
+    //   _ = Object.op_Inequality(this._someField@+0x20, null);  // dead expression (return val unused)
+    private void Awake()
+    {
+        GameObject go = gameObject;
+        UnityEngine.Object.DontDestroyOnLoad(go);
+        InitGUI(go, false);
+    }
+
+    // Source: Ghidra work/06_ghidra/decompiled_full/WndRoot/InitGUI.c RVA 0x01a0ad88
+    // 1-1 (StringLits resolved via stringliteral.json):
+    //   11873 = "UICamera"
+    //   11921 = "UI_eff_point_3"
+    //   12613 = "WndFormSystem: Not found UICamera for UIRoot"
+    // Body:
+    //   s_root = gObj
+    //   if (s_root != null) {
+    //     s_rootRectTrans = s_root.GetComponent<RectTransform>()                   // offset 8
+    //     if (s_camera == null) {                                                  // offset 0x10
+    //       var t = s_root.transform.Find("UICamera")
+    //       if (t != null) s_camera = t.gameObject.GetComponent<Camera>()
+    //     }
+    //     if (s_camera == null) { UJDebug.LogError("...Not found UICamera..."); return; }
+    //     var ct = s_root.transform.Find("UI_eff_point_3")
+    //     if (ct != null) {
+    //       s_Click_Eff3 = ct.gameObject                                           // offset 0x20
+    //       if (s_camera.nearClipPlane > -1f) s_camera.nearClipPlane = -1f         // 0xbf800000
+    //       if (s_camera.farClipPlane  < 200f) s_camera.farClipPlane = 200f       // 0x43480000
+    //       SetupScreenSize()
+    //     }
+    //   }
+    private static void InitGUI(GameObject gObj, bool isEditor = false)
+    {
+        s_root = gObj;
+        if (s_root == null) return;
+        s_rootRectTrans = s_root.GetComponent<RectTransform>();
+        if (s_camera == null)
+        {
+            var t = s_root.transform.Find("UICamera");
+            if (t != null) s_camera = t.gameObject.GetComponent<Camera>();
+        }
+        if (s_camera == null)
+        {
+            UJDebug.LogError("WndFormSystem: Not found UICamera for UIRoot");
+            return;
+        }
+        var ct = s_root.transform.Find("UI_eff_point_3");
+        if (ct != null)
+        {
+            s_Click_Eff3 = ct.gameObject;
+            if (s_camera.nearClipPlane > -1f) s_camera.nearClipPlane = -1f;
+            if (s_camera.farClipPlane < 200f) s_camera.farClipPlane = 200f;
+            SetupScreenSize();
+        }
+    }
     // Source: Ghidra work/06_ghidra/decompiled_full/WndRoot/Start.c RVA 0x01a0b304
     // 1-1:
     //   if (s_root == null) {

@@ -37,6 +37,9 @@ public static class LuaBinder
 		// Lua needs typeof(WndProperty) / typeof(WndSubProperty) for GetComponent<T> calls in WndForm_LoginGame.
 		WndPropertyWrap.Register(L);
 		WndSubPropertyWrap.Register(L);
+		// HAND-WRITTEN wrap for UnityEngine.RectTransform — exposes anchoredPosition / rect.width etc.
+		// Required because ProcessBase.lua V_Update touches clickEff.transform.anchoredPosition every UI click.
+		UnityEngine_RectTransformWrap.Register(L);
 		IconTextureMgrWrap.Register(L);
 		ImageViewerWrap.Register(L);
 		InfiniteVerticalScrollWrap.Register(L);

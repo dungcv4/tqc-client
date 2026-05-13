@@ -395,10 +395,20 @@ public class BaseProcLua : CBaseProc
     }
 
     // RVA: 0x15D7B68  Ghidra: work/06_ghidra/decompiled_full/BaseProcLua/IsEditor.c
-    // PORTED 1-1: returns 0 (false) — IL2CPP build is NOT editor.
+    // PORTED 1-1: original Android IL2CPP returns 0 (false) — APK was a player build, never editor.
+    // 2026-05-13 — Editor-only divergence (#if UNITY_EDITOR): return true when running inside the
+    // Unity Editor so Lua's `IS_EDITOR == true` branches activate (login form input fields via
+    // WndForm_LoginGame.InitUI_Editor, AchievementData/ClientDropData checks, FxhySDK skip path).
+    // Without this, account/password InputField stays hidden behind `EditorLoginwnd` (SetActive(false))
+    // and there is no way to authenticate against the local mock_server. IL2CPP/Player builds remain
+    // 1-1 with the original Android binary (return false) — divergence is editor-only.
     public static bool IsEditor()
     {
+#if UNITY_EDITOR
+        return true;
+#else
         return false;
+#endif
     }
 
     // RVA: 0x15D7B70  Ghidra: work/06_ghidra/decompiled_full/BaseProcLua/IsIOS.c

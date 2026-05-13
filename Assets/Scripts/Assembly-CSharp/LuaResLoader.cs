@@ -34,42 +34,33 @@ public class LuaResLoader : LuaFileUtils
     }
 
     // RVA: 0x18BF924  Ghidra: work/06_ghidra/decompiled_full/LuaResLoader/ReadFile.c
+    // Production 1-1 (#else branch): ReadDownLoadFile → ReadResourceFile → base.ReadFile (bundle).
     public override byte[] ReadFile(string fileName)
     {
-        // Ghidra:
-        //   lVar1 = ReadDownLoadFile();
-        //   if (lVar1 == 0 && (lVar1 = ReadResourceFile(fileName)) == 0) {
-        //       LuaInterface_LuaFileUtils__ReadFile(this, fileName, 0);
-        //   }
-        // Note: when one of the first two returns non-null, the caller doesn't actually
-        // capture/return it in the void Ghidra signature — but since the C# return type is byte[],
-        // we return whichever non-null value was found, falling back to base.ReadFile.
 #if UNITY_EDITOR
-        // Editor deviation (Ghidra-equivalent for cold-start state): in Editor we have _Assets/
-        // pre-extracted from AssetRipper (1619 files). Production initial boot has _Assets/ empty
-        // and only populates it from CDN patches. Ghidra's original order (disk → Resources → bundle)
-        // naturally takes the bundle path first in production's cold-start. To replicate that here —
-        // which is REQUIRED for ResMgr.GetLuaScript to be called and bLoad flags to be marked
-        // (so ProcessLunchGame.V_UpdateLoading case 3 IsLoadLuaFinish returns true) — try bundle
-        // (base.ReadFile → LuaFileUtils.ReadFile bundle branch) FIRST.
+        // EDITOR DEVIATION (necessary, not chế cháo):
+        // Production cold start has `<Application.dataPath>/_Assets/` empty → ReadDownLoadFile returns
+        // null → falls through to bundle correctly. In Editor, AssetRipper pre-populates `_Assets/`
+        // with 1619 .lua source files DECOMPILED from APK bytecode. The decompiler has bugs
+        // (e.g. _Assets/ToLua/misc/functions.lua line 20 emits `end, nil,  do` vs. canonical `end do`).
+        // If we follow Ghidra 1-1 order, ReadDownLoadFile reads the broken decompiled source first
+        // and Lua VM throws "unexpected symbol near 'do'" → LuaScriptMgr.InitStart fails → game
+        // can't boot. Inverting order to call base.ReadFile (bundle path) FIRST bypasses the
+        // broken disk files. Bundle bytecode (ResMgr.GetLuaScript → XOR decrypt) is intact and
+        // syntactically correct (it's what production runtime uses).
+        // Player/IL2CPP build (#else) preserves Ghidra 1-1 exactly.
         byte[] bundleBytes = base.ReadFile(fileName);
         if (bundleBytes != null) return bundleBytes;
         byte[] bytes = ReadDownLoadFile(fileName);
         if (bytes != null) return bytes;
         bytes = ReadResourceFile(fileName);
         if (bytes != null) return bytes;
-        return null; // bundle path already tried
+        return null;
 #else
         byte[] bytes = ReadDownLoadFile(fileName);
-        if (bytes != null)
-        {
-            return bytes;
-        }
+        if (bytes != null) return bytes;
         bytes = ReadResourceFile(fileName);
-        if (bytes != null)
-        {
-            return bytes;
-        }
+        if (bytes != null) return bytes;
         return base.ReadFile(fileName);
 #endif
     }

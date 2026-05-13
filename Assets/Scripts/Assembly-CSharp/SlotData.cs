@@ -26,30 +26,46 @@ public class SlotData
     public string RestrictColorTag; // 0x60
     public object luaData;        // 0x68
 
-    // Source: dump.cs RVA 0x1A028D0 — no Ghidra .ctor.c (empty body inferred per default pattern).
-    public SlotData() { }
+    // Source: Ghidra work/06_ghidra/decompiled_rva/SlotData___ctor.c RVA 0x1A028D0
+    // 1-1 port: base.ctor(); _bLock=false; then init ALL 7 string fields to ""
+    // (PTR_StringLiteral_0). Without these, fields default to null and Lua-side
+    // SetSlotData's `if slotData.strIcon == "" then ...lookup...` skips (nil != "")
+    // → strIcon stays null → UISlot.SetSlotDataLua passes null to IconTextureMgr →
+    // "The input asset name cannot be null" throw at AssetBundleOP.LoadAsync.
+    public SlotData()
+    {
+        this._bLock = false;
+        this.strIcon          = string.Empty;
+        this.CountText        = string.Empty;
+        this.RightTopText     = string.Empty;
+        this.LeftBottomTag    = string.Empty;
+        this.LeftTopTag       = string.Empty;
+        this.RightTopTag      = string.Empty;
+        this.RestrictColorTag = string.Empty;
+    }
 
-    // Source: dump.cs RVA 0x1A0298C — copy ctor. No standalone .c in decompiled_full/SlotData/.
-    // Body inferred from Clone.c usage (which calls this overload to duplicate `this`): canonical
-    // field-by-field copy. Confidence:medium — alternative would be partial copy but no evidence.
+    // Source: Ghidra work/06_ghidra/decompiled_rva/SlotData___ctor_copy.c RVA 0x1A0298C
+    // 1-1: base.ctor(); if (src==null) NRE; else field-by-field copy of 15 fields
+    // (matches Ghidra offsets 0x10, 0x18, 0x20, 0x28, 0x30, 0x38, 0x40, 0x44, 0x48,
+    // 0x50, 0x58, 0x60, 0x68).
     public SlotData(SlotData src)
     {
-        if (src == null) return;
-        this.nSlotDataID    = src.nSlotDataID;
-        this.strIcon        = src.strIcon;
-        this.nSlotType      = src.nSlotType;
-        this.nCount         = src.nCount;
-        this.CountText      = src.CountText;
-        this.RightTopText   = src.RightTopText;
-        this.nParam1        = src.nParam1;
-        this.nParam2        = src.nParam2;
-        this.nParam3        = src.nParam3;
-        this._bLock         = src._bLock;
-        this.LeftBottomTag  = src.LeftBottomTag;
-        this.LeftTopTag     = src.LeftTopTag;
-        this.RightTopTag    = src.RightTopTag;
-        this.RestrictColorTag = src.RestrictColorTag;
-        this.luaData        = src.luaData;
+        if (src == null) throw new System.NullReferenceException();  // Ghidra FUN_015cb8fc
+        this.nSlotDataID    = src.nSlotDataID;       // 0x10
+        this.strIcon        = src.strIcon;           // 0x18
+        this.nSlotType      = src.nSlotType;         // 0x20
+        this.nCount         = src.nCount;            // 0x24 — int32 read at 0x28? No: 0x24 nCount + 0x28 CountText
+        this.CountText      = src.CountText;         // 0x28
+        this.RightTopText   = src.RightTopText;     // 0x30
+        this.nParam1        = src.nParam1;           // 0x38 — Ghidra reads undefined8 at 0x38 (covers 0x38 + 0x3C if both int32)
+        this.nParam2        = src.nParam2;           // 0x3C
+        this.nParam3        = src.nParam3;           // 0x40
+        this._bLock         = src._bLock;            // 0x44 byte
+        this.LeftBottomTag  = src.LeftBottomTag;     // 0x48
+        this.LeftTopTag     = src.LeftTopTag;        // 0x50
+        this.RightTopTag    = src.RightTopTag;       // 0x58
+        this.RestrictColorTag = src.RestrictColorTag;// 0x60
+        this.luaData        = src.luaData;           // 0x68
     }
 
     // Source: Ghidra Clone.c  RVA 0x1A02A5C

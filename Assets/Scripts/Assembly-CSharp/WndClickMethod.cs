@@ -31,23 +31,26 @@ public class WndClickMethod : IWndComponent, IPointerClickHandler, IPointerDownH
 
     // Source: Ghidra work/06_ghidra/decompiled_full/WndClickMethod/InitComponent.c
     // RVA: 0x19570F4
-    // Body 1-1 (resolved via OnPointerClick.c parameter pack pattern):
-    //   if (_comp != null && !IsNullOrEmpty(_methodName)):
-    //     type = _comp.GetType()
-    //     if (type != typeof(string)):
+    // Body 1-1 (PTR_DAT_0345e010 = typeof(WndForm_Lua), confirmed via WndForm_LuaWrap.Register.c
+    //  using same handle for class registration; and stringliteral #3459 = "BtnClick_CallBack"):
+    //   if (wnd != null && !IsNullOrEmpty(_methodName)):
+    //     wndType = wnd.GetType()
+    //     if (wndType != typeof(WndForm_Lua)):
+    //       // direct method dispatch — C# WndForm subclass defines _methodName as a member
     //       types = new Type[5] { typeof(Component), typeof(PointerEventData), typeof(Action_Type), typeof(int), typeof(string) }
-    //       _method = type.GetMethod(_methodName, types)
+    //       _method = wndType.GetMethod(_methodName, types)
     //       if _method != null:
     //         _wnd = wnd
     //         _methodParams = new object[5] { _comp, null, null, null, null }
     //     else:
+    //       // Lua-driven WndForm → route through WndForm_Lua.BtnClick_CallBack(string, Component, PointerEventData, Action_Type, int, string)
     //       types = new Type[6] { typeof(string), typeof(Component), typeof(PointerEventData), typeof(Action_Type), typeof(int), typeof(string) }
-    //       _method = type.GetMethod("BtnClick_CallBack", types)
+    //       _method = wndType.GetMethod("BtnClick_CallBack", types)
     //       if _method != null:
     //         _wnd = wnd
     //         _methodParams = new object[6] { _methodName, _comp, null, null, null, null }
     //   if _method == null:
-    //     // log error "no method!!! " + _methodName (when _comp == null)
+    //     // log error "no method!!! " + _methodName (when wnd == null)
     //     // else "no method!!! WndID : {0} : {1} : {2}" string-builder of _wnd.WndID/_methodName/" : " + gameObject.name
     //     Debug.LogError(...); UnityEngine.Object.Destroy(this); return
     //   // Pivot adjustment to (0.5, 0.5) with anchoredPosition compensation
@@ -73,19 +76,23 @@ public class WndClickMethod : IWndComponent, IPointerClickHandler, IPointerDownH
     //   wndClip = GetComponent<WndAudioClip>()
     public override void InitComponent(WndForm wnd)
     {
-        // FIX 2026-05-12 (1-1 with Ghidra InitComponent.c): re-read of decompile shows
-        // `param_6` is `wnd` (the method parameter), NOT `_comp`. The reflection target type
-        // is `wnd.GetType()`, and _wnd field is set to wnd. _comp is only used as
-        // _methodParams[0] (a passthrough payload — can legitimately be null, which matches
-        // production prefab where _comp PPtr is (0, 0)/null verified via UnityPy parse of
-        // APK file 8c754ee25529db948b10cfb22e0bee92 path_ids 282/296/318).
+        // FIX 2026-05-13 (1-1 with Ghidra InitComponent.c): PTR_DAT_0345e010 was
+        // mis-identified as `typeof(string)`. Cross-reference confirms it is `typeof(WndForm_Lua)`:
+        //   - work/06_ghidra/decompiled_full/WndForm_LuaWrap/Register.c uses the same handle
+        //     for class registration with LuaInterface.LuaState (only WndForm_Lua's wrap).
+        //   - stringliteral idx 3459 = "BtnClick_CallBack" (the 6-arg method on WndForm_Lua
+        //     which routes a Lua method name + Component + EventData + Action_Type + int + string
+        //     through LuaFramework.Util.CallMethod).
+        // With the prior `typeof(string)` check, Lua-driven WndForms (e.g. WndForm_LoginGame)
+        // emit "no method!!! WndID:N : _OnConnectClick : ..." for every button → game unusable.
         //
         // Ghidra branching (param_6 == wnd):
         //   if (wnd == null) {
         //     if (_method == null) { log "no method!!! " + _methodName + Destroy(this); }
         //   } else if (!IsNullOrEmpty(_methodName)) {
         //     wndType = wnd.GetType();
-        //     if (wndType != typeof(string)) {
+        //     if (wndType != typeof(WndForm_Lua)) {
+        //       // direct dispatch — C# WndForm subclass implements the method
         //       types = [Component, PointerEventData, Action_Type, int, string]
         //       _method = wndType.GetMethod(_methodName, types);
         //       if (_method != null) {
@@ -93,6 +100,7 @@ public class WndClickMethod : IWndComponent, IPointerClickHandler, IPointerDownH
         //         _methodParams = new object[5] { _comp, null, null, null, null }
         //       }
         //     } else {
+        //       // Lua WndForm — route through BtnClick_CallBack(sLuaMethod, btn, data, action, int, string)
         //       types = [string, Component, PointerEventData, Action_Type, int, string]
         //       _method = wndType.GetMethod("BtnClick_CallBack", types);
         //       _wnd = wnd;
@@ -103,7 +111,7 @@ public class WndClickMethod : IWndComponent, IPointerClickHandler, IPointerDownH
         if (wnd != null && !string.IsNullOrEmpty(_methodName))
         {
             System.Type wndType = wnd.GetType();
-            if (wndType != typeof(string))
+            if (wndType != typeof(WndForm_Lua))
             {
                 var types = new System.Type[]
                 {
@@ -207,17 +215,17 @@ public class WndClickMethod : IWndComponent, IPointerClickHandler, IPointerDownH
 
     // Source: Ghidra work/06_ghidra/decompiled_full/WndClickMethod/OnPointerClick.c
     // RVA: 0x1956ABC
-    // 1-1 (re-read 2026-05-12 to fix port bug):
+    // 1-1 (re-read 2026-05-13 to fix typeof(WndForm_Lua) port bug):
     //   if (WaitQuitApp() || _wnd == null || !_wnd.IsActive() || _method == null) return;
     //   wndType = _wnd.GetType();
-    //   isStringType = (wndType == typeof(string));
+    //   isLuaWnd = (wndType == typeof(WndForm_Lua));   // PTR_DAT_0345e010 (same as InitComponent)
     //   if (_methodParams == null) NRE.
-    //   if (!isStringType):  // 5-arg form
+    //   if (!isLuaWnd):  // 5-arg form (_methodParams[0] already holds _comp from InitComponent)
     //     _methodParams[1] = eventData
     //     _methodParams[2] = (object)btnAction
     //     _methodParams[3] = (object)_ClickValue
     //     _methodParams[4] = _ClickString
-    //   else:  // 6-arg form (BtnClick_CallBack)
+    //   else:  // 6-arg form for WndForm_Lua.BtnClick_CallBack
     //     _methodParams[2] = eventData
     //     _methodParams[3] = (object)btnAction
     //     _methodParams[4] = (object)_ClickValue
@@ -237,9 +245,9 @@ public class WndClickMethod : IWndComponent, IPointerClickHandler, IPointerDownH
         if (!_wnd.IsActive()) return;
         if (_method == null) return;
         System.Type wndType = _wnd.GetType();
-        bool isStringType = (wndType == typeof(string));
+        bool isLuaWnd = (wndType == typeof(WndForm_Lua));
         if (_methodParams == null) throw new System.NullReferenceException();
-        if (!isStringType)
+        if (!isLuaWnd)
         {
             if (_methodParams.Length < 5) throw new System.IndexOutOfRangeException();
             _methodParams[1] = eventData;

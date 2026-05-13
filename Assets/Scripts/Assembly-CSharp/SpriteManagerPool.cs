@@ -293,10 +293,24 @@ public class SpriteManagerPool : MonoBehaviour
 
 	private Shader RoleETC1GrayShader;
 
+	// Source: Ghidra work/06_ghidra/decompiled_rva/SpriteManagerPool__get_Instance.c RVA 0x18D5E14
+	// MonoBehaviour singleton: if _instance == null (Unity null-check), creates new GameObject(name)
+	// then AddComponent<SpriteManagerPool>(), then calls checkShadow(). Throws null-deref on AddComponent fail.
+	// StringLiteral_10429 is the GameObject name; not extracted — using "SpriteManagerPool" as label.
 	public static SpriteManagerPool Instance
 	{
 		get
-		{ return default; }
+		{
+			if ((UnityEngine.Object)_instance == null)
+			{
+				UnityEngine.GameObject go = new UnityEngine.GameObject("SpriteManagerPool");
+				if ((UnityEngine.Object)go == null) throw new System.NullReferenceException();
+				_instance = go.AddComponent<SpriteManagerPool>();
+				if ((UnityEngine.Object)_instance == null) throw new System.NullReferenceException();
+				_instance.checkShadow();
+			}
+			return _instance;
+		}
 	}
 
 	// Source: dump.cs — Ghidra Awake.c not exported (likely sets singleton + DontDestroyOnLoad).
@@ -312,8 +326,30 @@ public class SpriteManagerPool : MonoBehaviour
 	{
 	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_rva/SpriteManagerPool__moveSpriteMgrToCenter.c RVA 0x18E4324
+	// Sets this.transform.position = ((mapWidth*64)/2, 0, (mapHeight*64)/2).
+	// Both axes use signed-/2 rounding; mapWidth/Height come from WrdFileMgr.Instance via its
+	// _wrdData._mapHeader. If _wrdData is null, the dimension defaults to 0.
+	// NOTE: Z is positive in Ghidra (not negated) — Lua caller flips Z elsewhere for boxColi only.
 	public void moveSpriteMgrToCenter()
-	{ }
+	{
+		UnityEngine.GameObject go = base.gameObject;
+		if ((UnityEngine.Object)go == null) throw new System.NullReferenceException();
+		UnityEngine.Transform t = go.transform;
+		if ((UnityEngine.Object)t == null) throw new System.NullReferenceException();
+
+		WrdFileMgr wm = WrdFileMgr.Instance;
+		if (wm == null) throw new System.NullReferenceException();
+		int w = wm.getMapWidth();
+		int h = wm.getMapHeight();
+
+		// Ghidra signed-/2 path: result = (dim * 64) / 2 with rounding toward zero for negatives.
+		// In C#, integer division on signed truncates toward zero, matching the asm sequence.
+		float halfX = (float)((w * 64) / 2);
+		float halfZ = (float)((h * 64) / 2);
+
+		t.position = new UnityEngine.Vector3(halfX, 0f, halfZ);
+	}
 
 	[IteratorStateMachine(typeof(_003CgetSpriteMgr_003Ed__23))]
 	private IEnumerator getSpriteMgr(string spriteName)
@@ -355,10 +391,22 @@ public class SpriteManagerPool : MonoBehaviour
 	public PackedSprite createShadow(string spriteName)
 	{ return default; }
 
-	// Source: dump.cs — Ghidra .ctor.c not exported (likely empty body).
-	// [Deviation note: Ghidra batch did not emit SpriteManagerPool/.ctor.c. Defaulting to
-	//  empty body (base MonoBehaviour.ctor handles init).]
+	// Source: Ghidra work/06_ghidra/decompiled_rva/SpriteManagerPool___ctor.c RVA 0x18E4F84
+	// Allocates 10 Dictionary instances at field offsets 0x20..0x68 (8-byte fields).
+	// Order matches dump.cs field layout. Then calls MonoBehaviour.ctor(this, 0).
+	// Type pairs come from PTR_DAT_03461570/03461578 (string,Coroutine),
+	// 03461580/03461588 (string,GameObject), 03461590/03461598 (string,SpriteManager).
 	public SpriteManagerPool()
 	{
+		_smWaitLoading                   = new Dictionary<string, Coroutine>();    // 0x20
+		_smPool                          = new Dictionary<string, GameObject>();   // 0x28
+		_smPoolInst                      = new Dictionary<string, SpriteManager>();// 0x30
+		_spritePFWaitLoading             = new Dictionary<string, Coroutine>();    // 0x38
+		_spritePFPool                    = new Dictionary<string, GameObject>();   // 0x40
+		_shadowSpriteManagerWaitLoading  = new Dictionary<string, Coroutine>();    // 0x48
+		_shadowSpriteManagerPool         = new Dictionary<string, GameObject>();   // 0x50
+		_shadowSpriteManagerPoolInst     = new Dictionary<string, SpriteManager>();// 0x58
+		_shadowSpritePrefabWaitLoading   = new Dictionary<string, Coroutine>();    // 0x60
+		_shadowSpritePrefabPool          = new Dictionary<string, GameObject>();   // 0x68
 	}
 }

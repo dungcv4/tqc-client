@@ -1,80 +1,38 @@
-using System.IO;
-using UnityEngine;
+// Source: Manual diag — verify icon bundle loaded by triggering ProcessLunchGame state.
 using System.Reflection;
-using System.Text;
+using UnityEngine;
 
-public class CheckBootState
+public static class CheckBootState
 {
     public static void Execute()
     {
-        var sb = new StringBuilder();
-
-        // ResMgr state
-        var rmType = System.Type.GetType("ResMgr, Assembly-CSharp");
-        var rmInst = rmType?.GetProperty("Instance")?.GetValue(null);
-        sb.AppendLine("=== ResMgr ===");
-        sb.AppendLine("rmInst: " + (rmInst != null));
-        if (rmInst != null)
+        // Try finding all ProcessLunchGame instances via FindObjectsOfType<MonoBehaviour>
+        var all = Object.FindObjectsOfType<MonoBehaviour>();
+        foreach (var mb in all)
         {
-            foreach (var f in rmType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            if (mb.GetType().Name == "ProcessLunchGame")
             {
-                if (f.Name.Contains("Bundle") || f.Name.Contains("File") || f.Name.Contains("List") || f.Name.Contains("Scene") || f.Name.Contains("FX"))
-                {
-                    var val = f.GetValue(rmInst);
-                    string desc;
-                    if (val == null) desc = "null";
-                    else if (val is System.Collections.IDictionary d) desc = "Dict[" + d.Count + "]";
-                    else if (val is System.Collections.ICollection c) desc = val.GetType().Name + "[" + c.Count + "]";
-                    else desc = val.ToString();
-                    sb.AppendLine($"  {f.Name} = {desc}");
-                }
+                Debug.Log("[CheckBootState] found ProcessLunchGame via Object.Find");
+                DumpStep(mb);
+                return;
             }
         }
+        Debug.LogWarning("[CheckBootState] ProcessLunchGame not found");
+    }
 
-        // Main state
-        sb.AppendLine("\n=== Main ===");
-        var mainType = System.Type.GetType("Main, Assembly-CSharp");
-        var mainInst = mainType?.GetProperty("Instance")?.GetValue(null);
-        sb.AppendLine("mainInst: " + (mainInst != null));
-        if (mainInst != null)
+    private static void DumpStep(object proc)
+    {
+        var t = proc.GetType();
+        string[] interesting = { "_stepUpdate", "_stepDownload", "_state", "_stepCurrent", "_lunched", "bWaitConfirm" };
+        foreach (var name in interesting)
         {
-            foreach (var f in mainType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
+            var f = t.GetField(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+            if (f != null) Debug.Log($"  {name} = {f.GetValue(proc)}");
+            else
             {
-                if (f.FieldType == typeof(bool) || f.FieldType == typeof(int) || f.FieldType.Name.Contains("State"))
-                {
-                    sb.AppendLine($"  Main.{f.Name} = {f.GetValue(mainInst)}");
-                }
-            }
-            // also static
-            foreach (var f in mainType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static))
-            {
-                if (f.FieldType == typeof(bool) || f.FieldType == typeof(int))
-                {
-                    sb.AppendLine($"  Main.{f.Name} (static) = {f.GetValue(null)}");
-                }
+                var p = t.GetProperty(name, BindingFlags.NonPublic | BindingFlags.Public | BindingFlags.Instance);
+                if (p != null) Debug.Log($"  {name} (prop) = {p.GetValue(proc)}");
             }
         }
-
-        // ProcessLunchGame state
-        sb.AppendLine("\n=== ProcessLunchGame ===");
-        var plgType = System.Type.GetType("ProcessLunchGame, Assembly-CSharp");
-        if (plgType != null)
-        {
-            var plgInst = plgType.GetProperty("Instance")?.GetValue(null);
-            sb.AppendLine("plgInst: " + (plgInst != null));
-            if (plgInst != null)
-            {
-                foreach (var f in plgType.GetFields(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance))
-                {
-                    if (f.FieldType == typeof(bool) || f.FieldType == typeof(int) || f.FieldType.Name == "DownloadStep")
-                    {
-                        sb.AppendLine($"  {f.Name} = {f.GetValue(plgInst)}");
-                    }
-                }
-            }
-        }
-
-        File.WriteAllText("/tmp/boot_state.txt", sb.ToString());
-        Debug.Log("[CheckBootState]\n" + sb);
     }
 }

@@ -1,10 +1,8 @@
+// Source: dump.cs TypeDefIndex (search BroadcastException) — public class : Exception,
+// ctor(string). Trivially passes message to base.
 using System;
-using Cpp2IlInjected;
 
 public class BroadcastException : Exception
 {
-	public BroadcastException(string msg)
-	{
-		throw new AnalysisFailedException("No IL was generated.");
-	}
+	public BroadcastException(string msg) : base(msg) { }
 }

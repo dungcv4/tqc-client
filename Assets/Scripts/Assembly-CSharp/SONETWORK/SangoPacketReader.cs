@@ -87,10 +87,16 @@ namespace SONETWORK
         }
 
         // RVA: 0x1974B28  Ghidra: work/06_ghidra/decompiled_full/SONETWORK.SangoPacketReader/processPackage.c
+        // 1-1 (BUGFIX 2026-05-13): Ghidra reads `local_58._2_2_` (offset 2 = m_pcSize), NOT
+        // `local_58._0_2_` (offset 0 = m_pcProtoco) as the previous port did. The size mismatch
+        // check `m_pcSize + 6 != packet_size` was always failing (e.g. proto=2003 → 2009 != 104)
+        // so inbound packets like CHECKACCRESULT got rejected with 0xffffff9a, breaking login.
         private int processPackage(ConnectProxy proxy, byte[] data, int offset, int size)
         {
-            // Ghidra layout: local_58:4 = m_pcProtoco+m_pcSize, local_54:2 = m_pcCompressSize,
-            // local_44:2 = out crc (separate stack var passed as `out`).
+            // Ghidra layout: local_58 holds proto_COMM struct read via readFromByteArray.
+            // local_58._2_2_ (offset 2, 2 bytes) = m_pcSize (uncompressed payload bytes)
+            // local_54 = m_pcCompressSize (offset 4)
+            // local_44 = out crc (separate stack var passed as `out`)
             proto_COMM local_58 = default(proto_COMM);
             ushort local_44 = 0;
 
@@ -99,8 +105,8 @@ namespace SONETWORK
                 return unchecked((int)0xffffff99);
             }
             local_58.readFromByteArray(out local_44, data, offset, false);
-            ushort uVar2 = (ushort)local_58.m_pcProtoco;        // local_58._0_2_
-            ushort uVar3 = (ushort)local_58.m_pcCompressSize;   // local_54
+            ushort uVar2 = (ushort)local_58.m_pcSize;           // local_58._2_2_ (offset 2)
+            ushort uVar3 = (ushort)local_58.m_pcCompressSize;   // local_54 (offset 4)
             int uVar6;
             if (uVar2 < 0xfde3)
             {

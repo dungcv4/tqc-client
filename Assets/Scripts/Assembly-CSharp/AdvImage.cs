@@ -52,8 +52,11 @@ public class AdvImage : Image
     }
 
     // String literal #2749 — Shader.Find target for default AdvImage shader.
-    // TODO: verify exact string from stringliteral.json (deferred to Tuần 8 lookup pass).
-    private const string STR_DEFAULT_ADV_SHADER = "UI/Default-AdvImage";
+    // Verified: work/03_il2cpp_dump/stringliteral.json[2749] = "ADV/UI/Default"
+    // Ghidra: decompiled_rva/AdvImage__get_defaultShader.c line 19 PTR_StringLiteral_2749.
+    // Earlier port placeholder "UI/Default-AdvImage" was a guess and caused Shader.Find
+    // to return null → Unity falls back to Hidden/InternalErrorShader (pink magenta).
+    private const string STR_DEFAULT_ADV_SHADER = "ADV/UI/Default";
 
     // Source: Ghidra get_defaultMaterial.c  RVA 0x17C2D70
     // Lazy init: if m_DefaultMaterial == null → new Material(Canvas.GetDefaultCanvasMaterial())
