@@ -68,8 +68,11 @@ _first_open.log
 game_view.png
 *.log
 
-# AssetRipper artifacts
+# AssetRipper artifacts — Premium (licensed) generates timestamped log files
+# (Leftover "AssetRipper.GUI.Free.log" pattern was from earlier Free trial; we use Premium now.)
 AssetRipper.GUI.Free.log
+AssetRipper.GUI.Premium.log
+AssetRipper_*.log
 
 # ============================================================================
 # Assets/ selective tracking — exclude game IP, keep our code + patches.
