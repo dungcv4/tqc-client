@@ -40,6 +40,11 @@ public static class LuaBinder
 		// HAND-WRITTEN wrap for UnityEngine.RectTransform — exposes anchoredPosition / rect.width etc.
 		// Required because ProcessBase.lua V_Update touches clickEff.transform.anchoredPosition every UI click.
 		UnityEngine_RectTransformWrap.Register(L);
+		// HAND-WRITTEN wrap for UnityEngine.AsyncOperation — exposes isDone / progress / allowSceneActivation.
+		// Required because Manager/SceneMgr.lua reads state.asynLoadOp.isDone on the return value of
+		// SceneManager.LoadSceneAsync. Without this wrap tolua throws "field or property isDone does not
+		// exist" and scene load never advances past 0% progress.
+		UnityEngine_AsyncOperationWrap.Register(L);
 		IconTextureMgrWrap.Register(L);
 		ImageViewerWrap.Register(L);
 		InfiniteVerticalScrollWrap.Register(L);
