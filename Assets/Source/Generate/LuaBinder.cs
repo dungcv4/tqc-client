@@ -45,6 +45,11 @@ public static class LuaBinder
 		// SceneManager.LoadSceneAsync. Without this wrap tolua throws "field or property isDone does not
 		// exist" and scene load never advances past 0% progress.
 		UnityEngine_AsyncOperationWrap.Register(L);
+		// HAND-WRITTEN wrap for UnityEngine.AudioSource — exposes volume / isPlaying + Play/Stop/Pause.
+		// Required because Manager/SceneMgr.lua:414 does typeof(UnityEngine.AudioSource) +
+		// PostProcessSceneObjects reads .volume on collected sources. Without the wrap, typeof returns
+		// nil and tolua throws "attempt to call typeof on type nil" right after scene loads.
+		UnityEngine_AudioSourceWrap.Register(L);
 		IconTextureMgrWrap.Register(L);
 		ImageViewerWrap.Register(L);
 		InfiniteVerticalScrollWrap.Register(L);
