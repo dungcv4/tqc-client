@@ -52,17 +52,39 @@ public class SpriteManager : MonoBehaviour
     protected Color[] colors;
     protected SpriteMesh_Managed tempSprite;
 
-    // RVA: 0x1573908  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/PixelSpaceToUVSpace.c
-    public Vector2 PixelSpaceToUVSpace(Vector2 xy) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/PixelSpaceToUVSpace_Vector2.c RVA 0x1573908
+    // 1-1: if (texture == null) return Vector2.zero;
+    //      return new Vector2(xy.x / texture.width, xy.y / texture.height);
+    // Ghidra dispatches Texture.width / .height through the abstract Texture base vtable at
+    // offsets +0x188 / +0x1a8 (klass.vtable). The C# equivalent uses the public properties.
+    public Vector2 PixelSpaceToUVSpace(Vector2 xy)
+    {
+        if ((UnityEngine.Object)texture == null) return Vector2.zero;
+        return new Vector2(xy.x / (float)texture.width, xy.y / (float)texture.height);
+    }
 
-    // RVA: 0x15739FC  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/PixelSpaceToUVSpace.c
-    public Vector2 PixelSpaceToUVSpace(int x, int y) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/PixelSpaceToUVSpace_int.c RVA 0x15739FC
+    // 1-1 wrapper: PixelSpaceToUVSpace((float)x, (float)y) via the Vector2 overload.
+    public Vector2 PixelSpaceToUVSpace(int x, int y)
+    {
+        return PixelSpaceToUVSpace(new Vector2((float)x, (float)y));
+    }
 
-    // RVA: 0x1573A08  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/PixelCoordToUVCoord.c
-    public Vector2 PixelCoordToUVCoord(Vector2 xy) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/PixelCoordToUVCoord_Vector2.c RVA 0x1573A08
+    // 1-1: identical to PixelSpaceToUVSpace except the divisor is `(width - 1)` / `(height - 1)`
+    // (pixel-center sampling vs pixel-edge sampling).
+    public Vector2 PixelCoordToUVCoord(Vector2 xy)
+    {
+        if ((UnityEngine.Object)texture == null) return Vector2.zero;
+        return new Vector2(xy.x / ((float)texture.width - 1f), xy.y / ((float)texture.height - 1f));
+    }
 
-    // RVA: 0x1573B10  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/PixelCoordToUVCoord.c
-    public Vector2 PixelCoordToUVCoord(int x, int y) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/PixelCoordToUVCoord_int.c RVA 0x1573B10
+    // 1-1 wrapper.
+    public Vector2 PixelCoordToUVCoord(int x, int y)
+    {
+        return PixelCoordToUVCoord(new Vector2((float)x, (float)y));
+    }
 
     // RVA: 0x1573B1C  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/SetupBoneWeights.c
     protected void SetupBoneWeights(SpriteMesh_Managed s) { throw new System.NotImplementedException(); }
@@ -112,32 +134,65 @@ public class SpriteManager : MonoBehaviour
     // RVA: 0x1575144  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/SortDrawingOrder.c
     public void SortDrawingOrder() { throw new System.NotImplementedException(); }
 
-    // RVA: 0x1576A18  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/GetSprite.c
-    public SpriteMesh_Managed GetSprite(int i) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/GetSprite.c RVA 0x1576A18
+    // 1-1: if (sprites == null) throw NRE;
+    //      if (i < sprites.Length) return sprites[i];   (Ghidra bounds-check via Cpp2IL IOOR thrower)
+    //      return null;
+    public SpriteMesh_Managed GetSprite(int i)
+    {
+        if (sprites == null) throw new System.NullReferenceException();
+        if (i < sprites.Length) return sprites[i];
+        return null;
+    }
 
-    // RVA: 0x1576A54  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/UpdatePositions.c
-    public void UpdatePositions() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/UpdatePositions.c RVA 0x1576A54
+    // 1-1: vertsChanged = true;
+    public void UpdatePositions() { vertsChanged = true; }
 
-    // RVA: 0x1576A60  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/UpdateUVs.c
-    public void UpdateUVs() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/UpdateUVs.c RVA 0x1576A60
+    // 1-1: uvsChanged = true;
+    public void UpdateUVs() { uvsChanged = true; }
 
-    // RVA: 0x1576A6C  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/UpdateColors.c
-    public void UpdateColors() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/UpdateColors.c RVA 0x1576A6C
+    // 1-1: colorsChanged = true;
+    public void UpdateColors() { colorsChanged = true; }
 
-    // RVA: 0x1576A78  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/UpdateBounds.c
-    public void UpdateBounds() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/UpdateBounds.c RVA 0x1576A78
+    // 1-1: updateBounds = true;
+    public void UpdateBounds() { updateBounds = true; }
 
-    // RVA: 0x1576A84  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/ScheduleBoundsUpdate.c
-    public void ScheduleBoundsUpdate(float seconds) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/ScheduleBoundsUpdate.c RVA 0x1576A84
+    // 1-1:
+    //   boundUpdateInterval = (int)seconds;   // Ghidra writes 4-byte int into field at +0x60
+    //   InvokeRepeating("UpdateBounds", seconds, seconds);   // lit 12303 = "UpdateBounds"
+    public void ScheduleBoundsUpdate(float seconds)
+    {
+        boundUpdateInterval = (float)(int)seconds;
+        InvokeRepeating("UpdateBounds", seconds, seconds);
+    }
 
-    // RVA: 0x1576AE8  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/CancelBoundsUpdate.c
-    public void CancelBoundsUpdate() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/CancelBoundsUpdate.c RVA 0x1576AE8
+    // 1-1: CancelInvoke("UpdateBounds");   // lit 12303 = "UpdateBounds"
+    public void CancelBoundsUpdate() { CancelInvoke("UpdateBounds"); }
 
-    // RVA: 0x1576B34  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/get_IsInitialized.c
-    public bool get_IsInitialized() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/get_IsInitialized.c RVA 0x1576B34
+    // 1-1: return *(byte*)(this + 0x2b) — initialized field.
+    public bool get_IsInitialized() { return initialized; }
 
-    // RVA: 0x1576B3C  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/get_ManagedRenderer.c
-    public Renderer get_ManagedRenderer() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/get_ManagedRenderer.c RVA 0x1576B3C
+    // 1-1: lazy GetComponent<SkinnedMeshRenderer>() cache:
+    //      if (meshRenderer != null) return meshRenderer;
+    //      meshRenderer = GetComponent<SkinnedMeshRenderer>();
+    //      return meshRenderer;
+    // Returns Renderer per dump.cs (covariant — SkinnedMeshRenderer inherits Renderer).
+    public Renderer get_ManagedRenderer()
+    {
+        if ((UnityEngine.Object)meshRenderer == null)
+        {
+            meshRenderer = GetComponent<SkinnedMeshRenderer>();
+        }
+        return meshRenderer;
+    }
 
     // RVA: 0x1576BE4  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/LateUpdate.c
     public virtual void LateUpdate() { throw new System.NotImplementedException(); }
@@ -145,19 +200,90 @@ public class SpriteManager : MonoBehaviour
     // RVA: 0x1576D64  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/DoMirror.c
     public virtual void DoMirror() { throw new System.NotImplementedException(); }
 
-    // RVA: 0x1576F08  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/Update.c
-    private void Update() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/Update.c RVA 0x1576F08
+    // 1-1: virtual-call indirection — production Update body is empty (the vtable slot at
+    // klass+0x188 / +0x190 dispatches to base MonoBehaviour Update which is no-op). Body
+    // ported as empty since the actual per-frame mesh work lives in LateUpdate.
+    private void Update() { }
 
-    // RVA: 0x1576F14  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/OnDrawGizmos.c
-    public virtual void OnDrawGizmos() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/OnDrawGizmos.c RVA 0x1576F14
+    // 1-1: if (drawBoundingBox) { Gizmos.color = white; DrawCenter(); … draw bounds }.
+    // Editor-only — full Gizmos.DrawLine sequence is in DrawCenter; here we only gate on the
+    // bool field and forward. Production includes a Renderer.bounds box-line block we
+    // approximate by delegating to DrawCenter (DrawCenter is what Ghidra calls first).
+    public virtual void OnDrawGizmos()
+    {
+        if (!drawBoundingBox) return;
+        UnityEngine.Gizmos.color = UnityEngine.Color.white;
+        DrawCenter();
+        if ((UnityEngine.Object)meshRenderer != null)
+        {
+            UnityEngine.Bounds b = meshRenderer.bounds;
+            UnityEngine.Vector3 c = b.center;
+            UnityEngine.Vector3 e = b.extents;
+            UnityEngine.Vector3 v000 = new UnityEngine.Vector3(c.x - e.x, c.y - e.y, c.z - e.z);
+            UnityEngine.Vector3 v100 = new UnityEngine.Vector3(c.x + e.x, c.y - e.y, c.z - e.z);
+            UnityEngine.Vector3 v010 = new UnityEngine.Vector3(c.x - e.x, c.y + e.y, c.z - e.z);
+            UnityEngine.Vector3 v110 = new UnityEngine.Vector3(c.x + e.x, c.y + e.y, c.z - e.z);
+            UnityEngine.Vector3 v001 = new UnityEngine.Vector3(c.x - e.x, c.y - e.y, c.z + e.z);
+            UnityEngine.Vector3 v101 = new UnityEngine.Vector3(c.x + e.x, c.y - e.y, c.z + e.z);
+            UnityEngine.Vector3 v011 = new UnityEngine.Vector3(c.x - e.x, c.y + e.y, c.z + e.z);
+            UnityEngine.Vector3 v111 = new UnityEngine.Vector3(c.x + e.x, c.y + e.y, c.z + e.z);
+            UnityEngine.Gizmos.DrawLine(v000, v100); UnityEngine.Gizmos.DrawLine(v100, v110);
+            UnityEngine.Gizmos.DrawLine(v110, v010); UnityEngine.Gizmos.DrawLine(v010, v000);
+            UnityEngine.Gizmos.DrawLine(v001, v101); UnityEngine.Gizmos.DrawLine(v101, v111);
+            UnityEngine.Gizmos.DrawLine(v111, v011); UnityEngine.Gizmos.DrawLine(v011, v001);
+            UnityEngine.Gizmos.DrawLine(v000, v001); UnityEngine.Gizmos.DrawLine(v100, v101);
+            UnityEngine.Gizmos.DrawLine(v110, v111); UnityEngine.Gizmos.DrawLine(v010, v011);
+        }
+    }
 
-    // RVA: 0x15772FC  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/OnDrawGizmosSelected.c
-    public void OnDrawGizmosSelected() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/OnDrawGizmosSelected.c RVA 0x15772FC
+    // 1-1: Gizmos.color = white; DrawCenter().
+    // Editor-only — fires when the GameObject is selected in scene view.
+    public void OnDrawGizmosSelected()
+    {
+        UnityEngine.Gizmos.color = UnityEngine.Color.white;
+        DrawCenter();
+    }
 
-    // RVA: 0x1576FC8  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/DrawCenter.c
-    protected void DrawCenter() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/DrawCenter.c RVA 0x1576FC8
+    // 1-1: draws a small "+" cross at this.transform.position. Editor-only visualisation.
+    // The Ghidra sequence is a series of Gizmos.DrawLine calls between Vector3 offsets of
+    // ±0.1 along each axis from transform.position. Constants 0x3dcccccd / 0xbdcccccd =
+    // ±0.1f IEEE-float.
+    protected void DrawCenter()
+    {
+        UnityEngine.Transform t = base.transform;
+        if ((UnityEngine.Object)t == null) return;
+        UnityEngine.Vector3 p = t.position;
+        const float s = 0.1f;
+        UnityEngine.Gizmos.DrawLine(new UnityEngine.Vector3(p.x - s, p.y, p.z), new UnityEngine.Vector3(p.x + s, p.y, p.z));
+        UnityEngine.Gizmos.DrawLine(new UnityEngine.Vector3(p.x, p.y - s, p.z), new UnityEngine.Vector3(p.x, p.y + s, p.z));
+        UnityEngine.Gizmos.DrawLine(new UnityEngine.Vector3(p.x, p.y, p.z - s), new UnityEngine.Vector3(p.x, p.y, p.z + s));
+    }
 
-    // RVA: 0x15773A8  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/.ctor.c
-    public SpriteManager() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/_ctor.c RVA 0x15773A8
+    // 1-1:
+    //   autoUpdateBounds = true;                              // byte @ 0x28
+    //   winding = WINDING_ORDER.CW (== 1 per DAT_008e3c10);   // enum @ 0x20
+    //   availableBlocks = new EZLinkedList<SpriteMesh_Managed>();   // @ 0x30
+    //   activeBlocks    = new EZLinkedList<SpriteMesh_Managed>();   // @ 0x48
+    //   spriteDrawOrder = new List<SpriteMesh_Managed>();           // @ 0x50
+    //   spriteAddQueue  = new List<SpriteRoot>();                   // @ 0x68
+    //   drawOrderComparer = new SpriteDrawLayerComparer();          // @ 0x58
+    //   allocBlockSize    = 0xa  (= 10, default block-alloc count);// int @ 0x24
+    //   MonoBehaviour..ctor(this);
+    public SpriteManager()
+    {
+        autoUpdateBounds  = true;
+        winding           = SpriteRoot.WINDING_ORDER.CW;
+        allocBlockSize    = 10;
+        availableBlocks   = new EZLinkedList<SpriteMesh_Managed>();
+        activeBlocks      = new EZLinkedList<SpriteMesh_Managed>();
+        spriteDrawOrder   = new System.Collections.Generic.List<SpriteMesh_Managed>();
+        spriteAddQueue    = new System.Collections.Generic.List<SpriteRoot>();
+        drawOrderComparer = new SpriteDrawLayerComparer();
+    }
 
 }
