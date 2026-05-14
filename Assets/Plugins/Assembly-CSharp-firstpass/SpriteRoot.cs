@@ -1620,9 +1620,17 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	public virtual void OnDrawGizmos() { }
 
 	// Source: Ghidra _ctor.c RVA 0x01581394
-	// 1-1: winding = CCW (0x40 = 1); anchor = TEXTURE_OFFSET (0x54 = 9); frameInfo.uvs.size = (1,1)
-	// (offsets 0x74, 0x78); tlTruncate = (1,1); brTruncate = (1,1); scaleFactor = (1,1);
-	// topLeftOffset = (1,1); bottomRightOffset = (1,1); leftClipPct/topClipPct = (1,1); color = white.
+	// 1-1: winding = CCW (0x40 = 1); anchor = TEXTURE_OFFSET (0x54 = 9).
+	//      The NEON_fmov(0x3f800000, 4) loads a Vec4 of 1.0f, then uVar4 (lower 8B) and uVar6
+	//      (upper 8B) become Vector2(1,1) used for: frameInfo.uvs (0x6c/0x74), tlTruncate (0xec),
+	//      brTruncate (0xf4), leftClipPct/rightClipPct (0x148), topClipPct/bottomClipPct (0x150),
+	//      color.rg (0x16c), color.ba (0x174).
+	//      THREE DIFFERENT rodata constants for scaleFactor / topLeftOffset / bottomRightOffset:
+	//        _DAT_0091c600 = Vector2(0.5, 0.5)  → scaleFactor    (0xa4)
+	//        _UNK_0091c608 = Vector2(-1, 1)    → topLeftOffset  (0xac)
+	//        DAT_008e36b0  = Vector2(1, -1)    → bottomRightOffset (0xb4)
+	//      Verified via raw rodata bytes at file offsets 0x81c600 / 0x81c608 / 0x7e36b0
+	//      (Ghidra virtual addresses = file offset + 0x100000 rebase).
 	// base() — MonoBehaviour.ctor.
 	protected SpriteRoot()
 	{
@@ -1632,9 +1640,11 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		uvRect = new Rect(0f, 0f, 1f, 1f);
 		tlTruncate = Vector2.one;
 		brTruncate = Vector2.one;
-		scaleFactor = Vector2.one;
-		topLeftOffset = Vector2.one;
-		bottomRightOffset = Vector2.one;
+		// 1-1 with binary rodata (NOT Vector2.one — that was an earlier guess that produced
+		// a degenerate quad because TL == BR collapsed verts to a single point):
+		scaleFactor       = new Vector2( 0.5f,  0.5f);   // _DAT_0091c600
+		topLeftOffset     = new Vector2(-1f,    1f);     // _UNK_0091c608
+		bottomRightOffset = new Vector2( 1f,   -1f);     // DAT_008e36b0
 		leftClipPct = 1f;
 		topClipPct = 1f;
 		color = Color.white;
