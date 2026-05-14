@@ -164,38 +164,34 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	public bool isMirror;
 
 	// Source: Ghidra get_Color.c RVA 0x01585434 — return color (offset 0x16c).
-	// set_Color: TODO RVA 0x01585444 — virtual ColorUpdateLogic chain, pending mapping.
+	// Source: Ghidra set_Color.c RVA 0x01585448 — virtual dispatch SetColor (vtable+0x318).
 	public Color Color
 	{
 		get { return color; }
-		set
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		set { SetColor(value); }
 	}
 
 	// Source: Ghidra get_RenderCamera.c RVA 0x01585948 — return renderCamera (offset 0x1a0).
-	// set_RenderCamera: TODO — Ghidra body has camera-attach logic.
+	// Source: Ghidra set_RenderCamera.c RVA 0x01585950
+	// 1-1: renderCamera = value; SetCamera(value) virtual vtable+0x368.
 	public virtual Camera RenderCamera
 	{
 		get { return renderCamera; }
 		set
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			renderCamera = value;
+			SetCamera(value);
 		}
 	}
 
 	// Source: Ghidra get_PixelSize.c RVA 0x01585E44
-	// 1-1: return Vector2(width / pixelsPerUV.x, ...).
-	// Ghidra simplifies to single float — only the x-component visible. In C# return
-	// the full Vector2 derived from width/pixelsPerUV.
+	// 1-1: return Vector2(width / pixelsPerUV.x, height / pixelsPerUV.y).
+	// Source: Ghidra set_PixelSize.c RVA 0x01585E58
+	// 1-1: SetSize(value.x * worldUnitsPerScreenPixel, value.y * worldUnitsPerScreenPixel) (vtable+0x298).
 	public Vector2 PixelSize
 	{
 		get { return new Vector2(width / pixelsPerUV.x, height / pixelsPerUV.y); }
-		set
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		set { SetSize(value.x * worldUnitsPerScreenPixel, value.y * worldUnitsPerScreenPixel); }
 	}
 
 	public Vector2 ImageSize
@@ -207,14 +203,33 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	}
 
 	// Source: Ghidra get_Managed.c RVA 0x01585E88 — return managed (offset 0x20).
-	// set_Managed: complex — see Ghidra RVA 0x01585E90 (Manager.RemoveSprite call + AddMesh).
-	// TODO for setter: implement Manager attach/detach logic.
+	// Source: Ghidra set_Managed.c RVA 0x01585E90
+	// 1-1: if (!value) {
+	//          if (managed && manager != null/destroyed) manager.RemoveSprite(this);
+	//          manager = null; managed = false;
+	//          if (spriteMesh == null || not SpriteMesh) AddMesh();
+	//      } else {
+	//          if (!managed) DestroyMesh();
+	//          managed = true;
+	//      }
 	public bool Managed
 	{
 		get { return managed; }
 		set
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			if (!value)
+			{
+				if (managed && (UnityEngine.Object)manager != null)
+				{
+					manager.RemoveSprite(this);
+				}
+				manager = null;
+				managed = false;
+				if (m_spriteMesh == null) AddMesh();
+				return;
+			}
+			if (!managed) DestroyMesh();
+			managed = true;
 		}
 	}
 
@@ -234,13 +249,26 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	}
 
 	// Source: Ghidra get_Clipped.c RVA 0x01586A84 — return clipped (offset 0x158).
-	// set_Clipped: TODO — Ghidra has set body but typically `clipped = value; if changed CalcClip()`.
+	// Source: Ghidra set_Clipped.c RVA 0x01586A8C
+	// 1-1: if (deleted) return. If value matches current clipped state → call vtable+0x2f8 (Unclip
+	// or no-op). If value is true and !clipped → set clipped=true + CalcSize + UpdateUVs.
+	// TODO: virtual slot 0x2f8 mapping pending (likely UpdateUVs/Unclip). For now: simple field set
+	// + CalcSize if transitioning from unclipped to clipped.
 	public virtual bool Clipped
 	{
 		get { return clipped; }
 		set
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			if (deleted) return;
+			if (!value && !clipped) return;
+			if (value && !clipped)
+			{
+				clipped = true;
+				CalcSize();
+				return;
+			}
+			// Transition clipped → unclipped or no change: dispatch UpdateUVs.
+			UpdateUVs();
 		}
 	}
 
@@ -297,13 +325,28 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	}
 
 	// Source: Ghidra get_spriteMesh.c RVA 0x01586DA0 — return m_spriteMesh (offset 0x180).
-	// set_spriteMesh: TODO RVA 0x01581BC4 (92 lines) — complex with sprite-attachment logic.
+	// Source: Ghidra set_spriteMesh.c RVA 0x01581BC4 (92 lines)
+	// 1-1: m_spriteMesh = value. If value != null: call value.get_sprite() virtual; if it !=
+	// this, call value.set_sprite(this) virtual (vtable+1 on ISpriteMesh). If managed && value
+	// is SpriteMesh_Managed, manager = value.manager.
 	public ISpriteMesh spriteMesh
 	{
 		get { return m_spriteMesh; }
 		set
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			m_spriteMesh = value;
+			if (m_spriteMesh == null) return;
+			SpriteRoot owner = m_spriteMesh.sprite;
+			if ((UnityEngine.Object)owner != this)
+			{
+				m_spriteMesh.sprite = this;
+			}
+			if (managed)
+			{
+				SpriteMesh_Managed sm = m_spriteMesh as SpriteMesh_Managed;
+				if (sm == null) throw new System.InvalidCastException();
+				manager = sm.manager;
+			}
 		}
 	}
 
@@ -607,42 +650,140 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		}
 	}
 
-	// Source: Ghidra SetSizeXY/XZ/YZ — bodies pending separate Ghidra reads. The methods are
-	// straightforward: build 4 vertices of the quad in the XY/XZ/YZ plane and write to mesh verts.
-	// TODO RVAs (likely contiguous around 0x015847..) — port-pending.
+	// Source: Ghidra SetSizeXY.c RVA 0x01584740
+	// 1-1: CalcEdges(); fill spriteMesh.vertices (virtual vtable+4) with 4 quad corners in XY plane:
+	//   v[0] = (offset.x + topLeft.x,      offset.y + topLeft.y,      offset.z)
+	//   v[1] = (offset.x + topLeft.x,      offset.y + bottomRight.y,  offset.z)
+	//   v[2] = (offset.x + bottomRight.x,  offset.y + bottomRight.y,  offset.z)
+	//   v[3] = (offset.x + bottomRight.x,  offset.y + topLeft.y,      offset.z)
+	// Then dispatch UpdateVerts (spriteMesh virtual vtable+10).
+	// Field map: topLeft (0xbc,0xc0,0xc4 — Vector3), bottomRight (0xc8,0xcc,0xd0 — Vector3).
 	protected void SetSizeXY(float w, float h)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		CalcEdges();
+		if (m_spriteMesh == null) return;
+		Vector3[] verts = m_spriteMesh.vertices;
+		if (verts == null || verts.Length < 4) return;
+		verts[0] = new Vector3(offset.x + topLeft.x,      offset.y + topLeft.y,      offset.z);
+		verts[1] = new Vector3(offset.x + topLeft.x,      offset.y + bottomRight.y,  offset.z);
+		verts[2] = new Vector3(offset.x + bottomRight.x,  offset.y + bottomRight.y,  offset.z);
+		verts[3] = new Vector3(offset.x + bottomRight.x,  offset.y + topLeft.y,      offset.z);
+		m_spriteMesh.UpdateVerts();
 	}
 
+	// Source: Ghidra SetSizeXZ.c RVA 0x015848F8
+	// 1-1: Same as XY but in XZ plane: y is offset.y, x/z swap with topLeft.x/bottomRight.y.
+	//   v[0] = (offset.x + topLeft.x,      offset.y, offset.z + topLeft.y)
+	//   v[1] = (offset.x + topLeft.x,      offset.y, offset.z + bottomRight.y)
+	//   v[2] = (offset.x + bottomRight.x,  offset.y, offset.z + bottomRight.y)
+	//   v[3] = (offset.x + bottomRight.x,  offset.y, offset.z + topLeft.y)
 	protected void SetSizeXZ(float w, float h)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		CalcEdges();
+		if (m_spriteMesh == null) return;
+		Vector3[] verts = m_spriteMesh.vertices;
+		if (verts == null || verts.Length < 4) return;
+		verts[0] = new Vector3(offset.x + topLeft.x,      offset.y, offset.z + topLeft.y);
+		verts[1] = new Vector3(offset.x + topLeft.x,      offset.y, offset.z + bottomRight.y);
+		verts[2] = new Vector3(offset.x + bottomRight.x,  offset.y, offset.z + bottomRight.y);
+		verts[3] = new Vector3(offset.x + bottomRight.x,  offset.y, offset.z + topLeft.y);
+		m_spriteMesh.UpdateVerts();
 	}
 
+	// Source: Ghidra SetSizeYZ.c RVA 0x01584AD0
+	// 1-1: YZ plane (x is offset.x, vertices vary in y/z).
+	//   v[0] = (offset.x, offset.y + topLeft.x, offset.z + topLeft.y)         (NEON_rev64 swap noted)
+	//   v[1] = (offset.x, offset.y + bottomRight.y, offset.z + topLeft.x)
+	//   v[2] = (offset.x, offset.y + bottomRight.x, offset.z + bottomRight.y) (NEON_rev64)
+	//   v[3] = (offset.x, offset.y + topLeft.y, offset.z + bottomRight.x)
+	// Note: YZ uses topLeft/bottomRight swapped components due to plane rotation.
 	protected void SetSizeYZ(float w, float h)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		CalcEdges();
+		if (m_spriteMesh == null) return;
+		Vector3[] verts = m_spriteMesh.vertices;
+		if (verts == null || verts.Length < 4) return;
+		verts[0] = new Vector3(offset.x, offset.y + topLeft.x,      offset.z + topLeft.y);
+		verts[1] = new Vector3(offset.x, offset.y + bottomRight.y,  offset.z + topLeft.x);
+		verts[2] = new Vector3(offset.x, offset.y + bottomRight.x,  offset.z + bottomRight.y);
+		verts[3] = new Vector3(offset.x, offset.y + topLeft.y,      offset.z + bottomRight.x);
+		m_spriteMesh.UpdateVerts();
 	}
 
+	// Source: Ghidra TruncateRight.c RVA 0x01584C94
+	// 1-1: tlTruncate.x = 1; brTruncate.x = clamp01(pct);
+	//   if (pct < 0) brTruncate.x = 0 (truncate everything off right side);
+	//   if (pct > 1) brTruncate.x = 1 (no truncation);
+	//   if (pct == 1 && tlTruncate.y == 1 && brTruncate.y == 1) → Untruncate (virtual vtable+0x2e8).
+	//   else → truncated = true; UpdateUVs (virtual vtable+0x308); CalcSize.
 	public virtual void TruncateRight(float pct)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		tlTruncate.x = 1f;
+		if (pct < 0f)      brTruncate.x = 0f;
+		else if (pct > 1f) brTruncate.x = 1f;
+		else               brTruncate.x = pct;
+		if (brTruncate.x >= 1f && tlTruncate.y >= 1f && brTruncate.y >= 1f)
+		{
+			Untruncate();
+			return;
+		}
+		truncated = true;
+		UpdateUVs();
+		CalcSize();
 	}
 
+	// Source: Ghidra TruncateLeft.c RVA 0x01584D30
+	// 1-1: brTruncate.x = 1; tlTruncate.x = clamp01(pct). Same Untruncate-or-update logic.
 	public virtual void TruncateLeft(float pct)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		brTruncate.x = 1f;
+		if (pct < 0f)      tlTruncate.x = 0f;
+		else if (pct > 1f) tlTruncate.x = 1f;
+		else               tlTruncate.x = pct;
+		if (tlTruncate.x >= 1f && tlTruncate.y >= 1f && brTruncate.y >= 1f)
+		{
+			Untruncate();
+			return;
+		}
+		truncated = true;
+		UpdateUVs();
+		CalcSize();
 	}
 
+	// Source: Ghidra TruncateTop.c RVA 0x01584DDC
+	// 1-1: brTruncate.y = 1; tlTruncate.y = clamp01(pct). Untruncate-or-update.
 	public virtual void TruncateTop(float pct)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		brTruncate.y = 1f;
+		if (pct < 0f)      tlTruncate.y = 0f;
+		else if (pct > 1f) tlTruncate.y = 1f;
+		else               tlTruncate.y = pct;
+		if (tlTruncate.y >= 1f && tlTruncate.x >= 1f && brTruncate.x >= 1f)
+		{
+			Untruncate();
+			return;
+		}
+		truncated = true;
+		UpdateUVs();
+		CalcSize();
 	}
 
+	// Source: Ghidra TruncateBottom.c RVA 0x01584E88
+	// 1-1: tlTruncate.y = 1; brTruncate.y = clamp01(pct). Untruncate-or-update.
 	public virtual void TruncateBottom(float pct)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		tlTruncate.y = 1f;
+		if (pct < 0f)      brTruncate.y = 0f;
+		else if (pct > 1f) brTruncate.y = 1f;
+		else               brTruncate.y = pct;
+		if (brTruncate.y >= 1f && tlTruncate.x >= 1f && brTruncate.x >= 1f)
+		{
+			Untruncate();
+			return;
+		}
+		truncated = true;
+		UpdateUVs();
+		CalcSize();
 	}
 
 	// Source: Ghidra Untruncate.c RVA 0x01584F24
@@ -1073,11 +1214,17 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 
 	public abstract void SetState(int index);
 
-	// Source: Ghidra DoMirror.c — not in batch (SpriteRoot.DoMirror likely dispatches manager.DoMirror).
-	// TODO: pending separate DoMirror Ghidra read.
+	// Source: Ghidra DoMirror.c RVA 0x01586E68
+	// 1-1: if Application.isPlaying → return. If screenSize.x == 0 || screenSize.y == 0 → Awake().
+	//      If mirror (offset 0x1e0 = SpriteRootMirror) == null → instantiate new SpriteRootMirror;
+	//      call mirror.SetParent(this) virtual vtable+0x178; mirror.Init(this) virtual vtable+0x188.
+	//      Then mirror.IsMirrorOk(this) check virtual vtable+0x198. If ok → Init(); mirror.SetParent again.
+	// TODO: SpriteRootMirror virtual slots + Init virtual at this+0x218 unresolved.
 	public virtual void DoMirror()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (UnityEngine.Application.isPlaying) return;
+		if (screenSize.x == 0f || screenSize.y == 0f) Awake();
+		// TODO: full mirror dispatch — SpriteRootMirror not yet exposed.
 	}
 
 	// Source: Ghidra OnDrawGizmosSelected.c RVA 0x01586FC0 — virtual dispatch vtable+0x418.
