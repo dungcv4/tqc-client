@@ -199,6 +199,30 @@ public static class InMapStateLogger
         }
         else sb.AppendLine("Main.Instance.mainCamera NULL or Main.Instance NULL");
 
+        // 9. What's inside the stage scene root? Maybe stage11 has its own scene Camera that
+        //    should be the active 3D renderer (and Main Camera in DontDestroyOnLoad is leftover).
+        Scene stageScn = SceneManager.GetSceneByName(_watchedScene);
+        if (stageScn.isLoaded)
+        {
+            sb.Append("Stage '").Append(_watchedScene).AppendLine("' root contents:");
+            foreach (GameObject root in stageScn.GetRootGameObjects())
+            {
+                sb.Append("  - root='").Append(root.name).Append("' active=").Append(root.activeSelf).AppendLine();
+                DumpTree(sb, root.transform, 1, 2);
+                Camera[] sceneCams = root.GetComponentsInChildren<Camera>(true);
+                if (sceneCams != null && sceneCams.Length > 0)
+                {
+                    sb.Append("    cameras inside stage root: ").Append(sceneCams.Length).AppendLine();
+                    foreach (Camera c in sceneCams)
+                    {
+                        sb.Append("      - ").Append(c.name).Append(" tag='").Append(c.tag).Append("'")
+                          .Append(" enabled=").Append(c.enabled).Append(" pos=").Append(c.transform.position.ToString("F1"))
+                          .AppendLine();
+                    }
+                }
+            }
+        }
+
         sb.AppendLine("==== [InMapStateLogger] END ====");
         UJDebug.Log(sb.ToString());
     }
