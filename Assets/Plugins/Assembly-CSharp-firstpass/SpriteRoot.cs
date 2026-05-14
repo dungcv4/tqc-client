@@ -308,19 +308,31 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		}
 	}
 
+	// Source: Ghidra get_TopLeft.c RVA 0x01586B84
+	// 1-1: if (spriteMesh == null) return Vector3.zero;
+	//      else return spriteMesh.vertices[0] (virtual vtable+4 = get_vertices).
 	public Vector3 TopLeft
 	{
 		get
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			if (m_spriteMesh == null) return Vector3.zero;
+			Vector3[] verts = m_spriteMesh.vertices;
+			if (verts == null || verts.Length == 0) throw new System.NullReferenceException();
+			return verts[0];
 		}
 	}
 
+	// Source: Ghidra get_BottomRight.c RVA 0x01586C90
+	// 1-1: if (spriteMesh == null) return Vector3.zero;
+	//      else return spriteMesh.vertices[2] (offset 0x20 + 2*12 = 0x38 in Ghidra).
 	public Vector3 BottomRight
 	{
 		get
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			if (m_spriteMesh == null) return Vector3.zero;
+			Vector3[] verts = m_spriteMesh.vertices;
+			if (verts == null || verts.Length < 3) throw new System.NullReferenceException();
+			return verts[2];
 		}
 	}
 
