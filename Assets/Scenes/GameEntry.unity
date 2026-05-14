@@ -2108,7 +2108,8 @@ Transform:
   m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
-  m_Children: []
+  m_Children:
+  - {fileID: 123}
   m_Father: {fileID: 324}
   m_LocalEulerAnglesHint: {x: 0, y: -0, z: -0}
 --- !u!4 &118
@@ -2198,13 +2199,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 54}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.13917309, y: 0, z: 0, w: 0.9902681}
+  m_LocalRotation: {x: 0.03315518, y: 0, z: 0, w: 0.9994502}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_LocalScale: {x: 296.00003, y: 296.00003, z: 296.00003}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 116}
-  m_Father: {fileID: 0}
+  m_Father: {fileID: 117}
   m_LocalEulerAnglesHint: {x: 15.999997, y: -0, z: -0}
 --- !u!4 &124
 Transform:
@@ -13184,9 +13185,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4ed1d33ef1a48140a3f5e3d56cc4ab8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_EffectColor: {r: 1, g: 1, b: 1, a: 1}
-  m_EffectDistance: {x: 1, y: -1}
-  m_UseGraphicAlpha: 1
 --- !u!114 &361
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -13757,9 +13755,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4ed1d33ef1a48140a3f5e3d56cc4ab8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_EffectColor: {r: 1, g: 1, b: 1, a: 1}
-  m_EffectDistance: {x: 1, y: -1}
-  m_UseGraphicAlpha: 1
 --- !u!114 &382
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14629,9 +14624,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4ed1d33ef1a48140a3f5e3d56cc4ab8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_EffectColor: {r: 1, g: 1, b: 1, a: 1}
-  m_EffectDistance: {x: 1, y: -1}
-  m_UseGraphicAlpha: 1
 --- !u!114 &415
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14917,9 +14909,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4ed1d33ef1a48140a3f5e3d56cc4ab8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_EffectColor: {r: 1, g: 1, b: 1, a: 1}
-  m_EffectDistance: {x: 1, y: -1}
-  m_UseGraphicAlpha: 1
 --- !u!114 &425
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -14966,9 +14955,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4ed1d33ef1a48140a3f5e3d56cc4ab8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_EffectColor: {r: 1, g: 1, b: 1, a: 1}
-  m_EffectDistance: {x: 1, y: -1}
-  m_UseGraphicAlpha: 1
 --- !u!114 &427
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15105,9 +15091,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4ed1d33ef1a48140a3f5e3d56cc4ab8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_EffectColor: {r: 1, g: 1, b: 1, a: 1}
-  m_EffectDistance: {x: 1, y: -1}
-  m_UseGraphicAlpha: 1
 --- !u!114 &432
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -15336,9 +15319,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4ed1d33ef1a48140a3f5e3d56cc4ab8, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  m_EffectColor: {r: 0.22794116, g: 0.11401681, b: 0.040224906, a: 1}
-  m_EffectDistance: {x: 1, y: 1}
-  m_UseGraphicAlpha: 1
 --- !u!114 &441
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -16376,7 +16356,6 @@ SceneRoots:
   - {fileID: 119}
   - {fileID: 121}
   - {fileID: 122}
-  - {fileID: 123}
   - {fileID: 126}
   - {fileID: 127}
   - {fileID: 271}
