@@ -346,7 +346,13 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 			}
 			return true;
 		}
-		while (curAnim.GetNextFrame(ref nextFrameInfo))
+		// Ghidra StepAnim.c line 48:
+		//   while (uVar10 = UVAnimation__GetNextFrame(lVar7, (undefined8 *)((long)param_2 + 0x6c)), ...)
+		// param_2 + 0x6c → byte offset 0x6c on SpriteRoot = `frameInfo` field (per dump.cs).
+		// Binary writes the next frame DIRECTLY into frameInfo. Previous port wrote into
+		// `nextFrameInfo` (a separate field that's never copied to frameInfo) → frameInfo stayed
+		// at the static-frame default → uvRect stayed at (1,1,1,1) → mesh UVs out of [0,1].
+		while (curAnim.GetNextFrame(ref frameInfo))
 		{
 			framesToAdvance      -= 1f;
 			timeSinceLastFrame   -= timeBetweenAnimFrames;
