@@ -649,6 +649,9 @@ public class Main : MonoBehaviour
         // Source: Ghidra refs static field at offset 0x81 = bSetupUICameraRect (not bInitScreenOrigin which is 0x40)
         if (!bSetupUICameraRect) SetupUICameraRect();
         CheckShowFps();
+        // HAND-ADDED DIAGNOSTIC (not from Ghidra) — one-shot in-map state dump 60 frames after a
+        // `stage*` scene becomes active. Removable by deleting this line + InMapStateLogger.cs.
+        InMapStateLogger.TickFromMainUpdate();
     }
 
     // Source: Ghidra work/06_ghidra/decompiled_full/Main/FixedUpdate.c RVA 0x015B80E0
