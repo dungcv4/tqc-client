@@ -145,10 +145,37 @@ public static class InMapStateLogger
             int playerLayer = playerGo.layer;
             sb.Append("PLAYER-100001 layer=").Append(playerLayer).Append(" (")
               .Append(LayerMask.LayerToName(playerLayer)).AppendLine(")");
+            // Proper frustum test (not just layer mask) — checks if any sub-renderer bounds
+            // intersects the camera frustum. This is the ACTUAL "is it on screen?" test.
             foreach (Camera c in cams)
             {
-                bool sees = (c.cullingMask & (1 << playerLayer)) != 0;
-                sb.Append("    visible to ").Append(c.name).Append("? ").Append(sees).AppendLine();
+                bool layerOK = (c.cullingMask & (1 << playerLayer)) != 0;
+                bool frustumHit = false;
+                if (layerOK)
+                {
+                    var planes = GeometryUtility.CalculateFrustumPlanes(c);
+                    var renderers = playerGo.GetComponentsInChildren<Renderer>(true);
+                    foreach (var r in renderers)
+                    {
+                        if (r == null || !r.enabled) continue;
+                        if (GeometryUtility.TestPlanesAABB(planes, r.bounds))
+                        {
+                            frustumHit = true;
+                            break;
+                        }
+                    }
+                    // Player sprites have no direct Renderer (SM2 stack renders separately);
+                    // also test camera.WorldToViewportPoint of player position.
+                    Vector3 vp = c.WorldToViewportPoint(playerGo.transform.position);
+                    bool vpInRange = vp.z > 0 && vp.x >= 0 && vp.x <= 1 && vp.y >= 0 && vp.y <= 1;
+                    sb.Append("    visible to ").Append(c.name)
+                      .Append("? layerOK=").Append(layerOK)
+                      .Append(" frustumHit=").Append(frustumHit)
+                      .Append(" viewport=(").Append(vp.x.ToString("F2")).Append(",")
+                      .Append(vp.y.ToString("F2")).Append(",").Append(vp.z.ToString("F1")).Append(")")
+                      .Append(" inRange=").Append(vpInRange).AppendLine();
+                }
+                else sb.Append("    visible to ").Append(c.name).AppendLine("? layer MASKED OUT");
             }
 
             // 6b. DIAG: dump PLAYER hierarchy + renderers + sprite components so we can see
