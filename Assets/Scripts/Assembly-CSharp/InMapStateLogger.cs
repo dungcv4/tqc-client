@@ -254,12 +254,16 @@ public static class InMapStateLogger
                             }
                             else
                             {
-                                sb.Append("        slot").Append(s).Append(": verts[0]=").Append(verts[baseV].ToString("F1"))
-                                  .Append(" verts[2]=").Append(verts[baseV + 2].ToString("F1"));
+                                sb.Append("        slot").Append(s).Append(": bone=").Append(bone).AppendLine();
+                                sb.Append("          verts: v0=").Append(verts[baseV].ToString("F1"))
+                                  .Append(" v1=").Append(verts[baseV + 1].ToString("F1"))
+                                  .Append(" v2=").Append(verts[baseV + 2].ToString("F1"))
+                                  .Append(" v3=").Append(verts[baseV + 3].ToString("F1")).AppendLine();
                                 if (uvs != null && uvs.Length > baseV + 3)
-                                    sb.Append(" uv[0]=").Append(uvs[baseV].ToString("F3"))
-                                      .Append(" uv[2]=").Append(uvs[baseV + 2].ToString("F3"));
-                                sb.Append(" bone=").Append(bone).AppendLine();
+                                    sb.Append("          uvs:   u0=").Append(uvs[baseV].ToString("F3"))
+                                      .Append(" u1=").Append(uvs[baseV + 1].ToString("F3"))
+                                      .Append(" u2=").Append(uvs[baseV + 2].ToString("F3"))
+                                      .Append(" u3=").Append(uvs[baseV + 3].ToString("F3")).AppendLine();
                             }
                         }
                     }
