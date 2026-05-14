@@ -64,13 +64,20 @@ public static class InMapStateLogger
         sb.Append("Cameras (").Append(cams.Length).AppendLine(" active):");
         foreach (Camera c in cams)
         {
-            sb.Append("  - ").Append(c.name)
+            // Trace parent chain so we can see which root-scene + parent path each camera belongs to.
+            string parentPath = c.name;
+            Transform pt = c.transform.parent;
+            while (pt != null) { parentPath = pt.name + "/" + parentPath; pt = pt.parent; }
+            sb.Append("  - ").Append(parentPath)
+              .Append(" scene='").Append(c.gameObject.scene.name).Append("'")
               .Append(" enabled=").Append(c.enabled)
               .Append(" depth=").Append(c.depth)
               .Append(" clearFlags=").Append(c.clearFlags)
               .Append(" cullingMask=0x").Append(c.cullingMask.ToString("X"))
               .Append(" pos=").Append(c.transform.position.ToString("F1"))
               .Append(" rot=").Append(c.transform.eulerAngles.ToString("F0"))
+              .Append(" fov=").Append(c.fieldOfView.ToString("F0"))
+              .Append(" ortho=").Append(c.orthographic).Append(c.orthographic ? ":" + c.orthographicSize : "")
               .AppendLine();
         }
 
@@ -99,21 +106,70 @@ public static class InMapStateLogger
             sb.AppendLine("GUI_Root: NOT FOUND");
         }
 
-        // 5. Renderers actually inside the stage scene.
+        // 5. Renderers actually inside the stage scene — group by layer to see what culls them.
         Scene stage = SceneManager.GetSceneByName(_watchedScene);
         if (stage.isLoaded)
         {
             int totalRenderers = 0;
             int activeRenderers = 0;
+            Dictionary<int, int> rendererCountByLayer = new Dictionary<int, int>();
             foreach (GameObject root in stage.GetRootGameObjects())
             {
                 Renderer[] rs = root.GetComponentsInChildren<Renderer>(true);
                 totalRenderers += rs.Length;
-                foreach (Renderer r in rs) if (r.enabled && r.gameObject.activeInHierarchy) activeRenderers++;
+                foreach (Renderer r in rs)
+                {
+                    if (r.enabled && r.gameObject.activeInHierarchy)
+                    {
+                        activeRenderers++;
+                        int lyr = r.gameObject.layer;
+                        rendererCountByLayer.TryGetValue(lyr, out int cnt);
+                        rendererCountByLayer[lyr] = cnt + 1;
+                    }
+                }
             }
             sb.Append("Stage '").Append(_watchedScene).Append("' renderers: ")
               .Append(activeRenderers).Append("/").Append(totalRenderers).AppendLine(" active/total");
+            sb.Append("  active renderers by layer: ");
+            foreach (var kv in rendererCountByLayer)
+                sb.Append(LayerMask.LayerToName(kv.Key)).Append("(").Append(kv.Key).Append(")=").Append(kv.Value).Append(" ");
+            sb.AppendLine();
         }
+
+        // 6. Player entity layer + which cameras can see it.
+        GameObject playerGo = GameObject.Find("PLAYER-100001");
+        if (playerGo != null)
+        {
+            int playerLayer = playerGo.layer;
+            sb.Append("PLAYER-100001 layer=").Append(playerLayer).Append(" (")
+              .Append(LayerMask.LayerToName(playerLayer)).AppendLine(")");
+            foreach (Camera c in cams)
+            {
+                bool sees = (c.cullingMask & (1 << playerLayer)) != 0;
+                sb.Append("    visible to ").Append(c.name).Append("? ").Append(sees).AppendLine();
+            }
+        }
+        else
+        {
+            sb.AppendLine("PLAYER-100001 NOT FOUND");
+        }
+
+        // 7. Cameras' tracked targets via PlayerCamControl reflection (single shot, defensive).
+        var pcc = PlayerCamControl.Instance;
+        if (pcc != null)
+        {
+            sb.Append("PlayerCamControl.Instance found, cameraTarget field via reflection: ");
+            var f = typeof(PlayerCamControl).GetField("cameraTarget", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+            if (f != null)
+            {
+                var tgt = f.GetValue(pcc) as Component;
+                sb.AppendLine(tgt == null ? "null" : (tgt.name + " @ " + tgt.transform.position.ToString("F1")));
+            }
+            else sb.AppendLine("field missing");
+            sb.Append("  CAM_HEIGHT=").Append(PlayerCamControl.CAM_HEIGHT)
+              .Append("  CAMZ_DIS=").Append(pcc.CAMZ_DIS).AppendLine();
+        }
+        else sb.AppendLine("PlayerCamControl.Instance NULL");
 
         sb.AppendLine("==== [InMapStateLogger] END ====");
         UJDebug.Log(sb.ToString());
