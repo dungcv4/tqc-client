@@ -516,8 +516,17 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		pauseFrame = -1;
 		float fr = anim.framerate;
 		float invFr = (fr != 0f) ? 1f / fr : 1f;
+		// Ghidra PlayAnim.c lines 62-63 (also PlayAnimInReverse.c line 41-42):
+		//   *(float *)((long)param_1 + 0x224) = invFr;   // timeBetweenAnimFrames (+0x224)
+		//   *(float *)(param_1 + 0x44)        = invFr;   // timeSinceLastFrame    (+0x220)
+		// (param_1 is long*; +0x44 means +0x44*8 = +0x220 byte offset)
+		// Previous port wrote framesToAdvance (+0x228) which has no effect — StepAnim
+		// overwrites framesToAdvance from timeSinceLastFrame / timeBetweenAnimFrames.
+		// The correct 1-1 binary semantic: seed timeSinceLastFrame = invFr so that
+		// StepAnim(0f) immediately computes framesToAdvance = 1.0 and triggers the first
+		// GetNextFrame → frame 0 UVs propagate to mesh.
 		timeBetweenAnimFrames = invFr;
-		framesToAdvance       = invFr;
+		timeSinceLastFrame    = invFr;
 		if (anim.frames.Length < 2 || fr == 0f)
 		{
 			PauseAnim();
@@ -627,8 +636,17 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		anim.curFrame = anim.frames.Length;
 		float fr = anim.framerate;
 		float invFr = (fr != 0f) ? 1f / fr : 1f;
+		// Ghidra PlayAnim.c lines 62-63 (also PlayAnimInReverse.c line 41-42):
+		//   *(float *)((long)param_1 + 0x224) = invFr;   // timeBetweenAnimFrames (+0x224)
+		//   *(float *)(param_1 + 0x44)        = invFr;   // timeSinceLastFrame    (+0x220)
+		// (param_1 is long*; +0x44 means +0x44*8 = +0x220 byte offset)
+		// Previous port wrote framesToAdvance (+0x228) which has no effect — StepAnim
+		// overwrites framesToAdvance from timeSinceLastFrame / timeBetweenAnimFrames.
+		// The correct 1-1 binary semantic: seed timeSinceLastFrame = invFr so that
+		// StepAnim(0f) immediately computes framesToAdvance = 1.0 and triggers the first
+		// GetNextFrame → frame 0 UVs propagate to mesh.
 		timeBetweenAnimFrames = invFr;
-		framesToAdvance       = invFr;
+		timeSinceLastFrame    = invFr;
 		if (anim.frames.Length < 2 || fr == 0f)
 		{
 			PauseAnim();
