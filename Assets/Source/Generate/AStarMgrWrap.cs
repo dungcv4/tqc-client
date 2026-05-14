@@ -16,6 +16,11 @@ public class AStarMgrWrap
 		L.RegFunction("SimulateCaculate", SimulateCaculate);
 		L.RegFunction("__eq", op_Equality);
 		L.RegFunction("__tostring", ToLua.op_ToString);
+		// Lua reads `AStarMgr.Instance:SpawnNodes()` (MapInfoMgr.lua:2314) etc. — needs property
+		// accessor. Auto-gen omitted this when first generated; restored 1-1 with other singleton
+		// wraps (BinFileMgrWrap, ConfigMgrWrap, ResMgrWrap, …) which all expose Instance via RegVar.
+		L.RegVar("Instance",   get_Instance,   null);
+		L.RegVar("TotalNodes", get_TotalNodes, null);
 		L.EndClass();
 	}
 

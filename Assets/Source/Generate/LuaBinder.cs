@@ -67,6 +67,10 @@ public static class LuaBinder
 		SGCRegionWrap.Register(L);
 		SGCSteamManagerWrap.Register(L);
 		SlotDataWrap.Register(L);
+		// HAND-WRITTEN wrap (production had SMapTextureMgrWrap auto-gen at TypeDefIndex 439,
+		// SpineSkin clash blocks regen). Required so Lua WndForm_MainSMap can resolve
+		// `SMapTextureMgr.Instance:GetSMapSprite(...)` — otherwise V_Create explodes.
+		SMapTextureMgrWrap.Register(L);
 		SoundProxyWrap.Register(L);
 		SpriteManagerPoolWrap.Register(L);
 		SpriteRootWrap.Register(L);
@@ -151,6 +155,13 @@ public static class LuaBinder
 		UnityEngine_PlayModeWrap.Register(L);
 		UnityEngine_ProjectorWrap.Register(L);
 		UnityEngine_RectWrap.Register(L);
+		// HAND-WRITTEN wrap for UnityEngine.Resolution (value-type struct).
+		// Required because WndForm/UISafeArea.lua reads `Screen.currentResolution.width/height`
+		// during CheckSafeArea (which every form invokes via WndForm.Create → V_Create).
+		// Without the wrap, accessing .width returns nil because the pushed value-type userdata
+		// has no metatable. Lives inside the UnityEngine module so the type registers as
+		// `UnityEngine.Resolution` (matching the dump.cs full name).
+		UnityEngine_ResolutionWrap.Register(L);
 		UnityEngine_RectOffsetWrap.Register(L);
 		UnityEngine_RectTransformUtilityWrap.Register(L);
 		UnityEngine_RenderTextureWrap.Register(L);
