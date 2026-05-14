@@ -98,23 +98,182 @@ public class SpriteManager : MonoBehaviour
     // RVA: 0x1574078  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/EnlargeArrays.c
     protected int EnlargeArrays(int count) { throw new System.NotImplementedException(); }
 
-    // RVA: 0x1574F00  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/AlreadyAdded.c
-    public bool AlreadyAdded(SpriteRoot sprite) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/AlreadyAdded.c RVA 0x1574F00
+    // 1-1:
+    //   if (activeBlocks == null) throw NRE;
+    //   if (!activeBlocks.Rewind()) return false;
+    //   do {
+    //       SpriteMesh_Managed cur = activeBlocks.Current;
+    //       SpriteRoot itsSprite = cur.sprite;                  // virtual property @vtable+0x2a8
+    //       if (itsSprite == sprite) return true;               // UnityEngine.Object.op_Equality
+    //   } while (activeBlocks.MoveNext());
+    //   return false;
+    public bool AlreadyAdded(SpriteRoot sprite)
+    {
+        if (activeBlocks == null) throw new System.NullReferenceException();
+        if (!activeBlocks.Rewind()) return false;
+        do
+        {
+            SpriteMesh_Managed cur = activeBlocks.get_Current();
+            if (cur != null)
+            {
+                SpriteRoot s = cur.sprite;
+                if ((UnityEngine.Object)s == (UnityEngine.Object)sprite) return true;
+            }
+        } while (activeBlocks.MoveNext());
+        return false;
+    }
 
-    // RVA: 0x1575008  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/AddSprite.c
-    public SpriteMesh_Managed AddSprite(GameObject go) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/AddSprite_GameObject.c RVA 0x1575008
+    // 1-1 wrapper:
+    //   if (go == null) throw NRE;
+    //   SpriteRoot sr = go.GetComponent<SpriteRoot>();
+    //   if (sr == null) return null;                            // Unity op_Equality null-check
+    //   return AddSprite(sr);                                   // delegate to SpriteRoot overload
+    public SpriteMesh_Managed AddSprite(GameObject go)
+    {
+        if ((UnityEngine.Object)go == null) throw new System.NullReferenceException();
+        SpriteRoot sr = go.GetComponent<SpriteRoot>();
+        if ((UnityEngine.Object)sr == null) return null;
+        return AddSprite(sr);
+    }
 
-    // RVA: 0x15747DC  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/AddSprite.c
-    public SpriteMesh_Managed AddSprite(SpriteRoot sprite) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/AddSprite_SpriteRoot.c RVA 0x15747DC
+    // ~250-line decompile of the main add path. 1-1 mapping:
+    //   if (sprite == null) throw NRE.
+    //   // already-managed fast-path
+    //   if (sprite.manager == this && sprite.addedToManager)
+    //       return (SpriteMesh_Managed)sprite.spriteMesh;
+    //   // not-yet-initialized: queue and return null
+    //   if (!initialized) {
+    //       if (spriteAddQueue == null) spriteAddQueue = new List<SpriteRoot>();
+    //       spriteAddQueue.Add(sprite);
+    //       return null;
+    //   }
+    //   // allocate a slot from availableBlocks; grow if empty
+    //   if (availableBlocks.get_Empty()) EnlargeArrays(allocBlockSize);
+    //   SpriteMesh_Managed slot = availableBlocks.get_Head();
+    //   int idx = slot.index;
+    //   availableBlocks.Remove(slot);
+    //   SpriteMesh_Managed sm = sprites[idx];
+    //   sprite.spriteMesh = sm;
+    //   sprite.manager = this;
+    //   sprite.addedToManager = true;
+    //   if (sm != null) {
+    //       sm.drawLayer = sprite.drawLayer;
+    //       Transform spT = sprite.gameObject.transform;
+    //       bones[idx] = spT;
+    //       bindPoses[idx] = bones[idx].worldToLocalMatrix * sprite.transform.localToWorldMatrix;
+    //       activeBlocks.Add(sm);
+    //       sm.Init();                                          // virtual @vtable+0x338 → ISpriteMesh.Init
+    //       SortDrawingOrder();
+    //       colorsChanged = true;
+    //       vertsChanged = true; uvsChanged = true;             // Ghidra writes 0x101 as ushort over (vertsChanged, uvsChanged)
+    //       if (meshRenderer != null && !meshRenderer.enabled)
+    //           meshRenderer.enabled = true;
+    //       return sm;
+    //   }
+    //   throw NRE.
+    public SpriteMesh_Managed AddSprite(SpriteRoot sprite)
+    {
+        if ((UnityEngine.Object)sprite == null) throw new System.NullReferenceException();
+        // already-managed fast-path
+        if ((UnityEngine.Object)sprite.manager == this && sprite.addedToManager)
+        {
+            return (SpriteMesh_Managed)sprite.spriteMesh;
+        }
+        // queue if not initialized
+        if (!initialized)
+        {
+            if (spriteAddQueue == null) spriteAddQueue = new System.Collections.Generic.List<SpriteRoot>();
+            spriteAddQueue.Add(sprite);
+            return null;
+        }
+        if (activeBlocks == null || availableBlocks == null) throw new System.NullReferenceException();
+        if (availableBlocks.get_Empty()) EnlargeArrays(allocBlockSize);
+        SpriteMesh_Managed slot = availableBlocks.get_Head();
+        if (slot == null) throw new System.NullReferenceException();
+        int idx = slot.index;
+        availableBlocks.Remove(slot);
+        if (sprites == null) throw new System.NullReferenceException();
+        if (idx < 0 || idx >= sprites.Length) throw new System.IndexOutOfRangeException();
+        SpriteMesh_Managed sm = sprites[idx];
+        sprite.spriteMesh = sm;
+        sprite.manager = this;
+        sprite.addedToManager = true;
+        if (sm != null)
+        {
+            sm.drawLayer = sprite.drawLayer;
+            UnityEngine.GameObject sprGO = sprite.gameObject;
+            if ((UnityEngine.Object)sprGO == null) throw new System.NullReferenceException();
+            UnityEngine.Transform spT = sprGO.transform;
+            if ((UnityEngine.Object)spT == null) throw new System.NullReferenceException();
+            if (bones == null) throw new System.NullReferenceException();
+            if (idx >= bones.Length) throw new System.IndexOutOfRangeException();
+            bones[idx] = spT;
+            if (bindPoses == null) throw new System.NullReferenceException();
+            if (idx >= bindPoses.Length) throw new System.IndexOutOfRangeException();
+            bindPoses[idx] = bones[idx].worldToLocalMatrix * sprite.transform.localToWorldMatrix;
+            activeBlocks.Add(sm);
+            sm.Init();   // vtable @+0x338 → SpriteMesh_Managed.Init() per ISpriteMesh interface
+            SortDrawingOrder();
+            colorsChanged = true;
+            vertsChanged = true;
+            uvsChanged   = true;
+            if ((UnityEngine.Object)meshRenderer != null && !meshRenderer.enabled)
+            {
+                meshRenderer.enabled = true;
+            }
+            return sm;
+        }
+        throw new System.NullReferenceException();
+    }
 
-    // RVA: 0x1575380  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/CreateSprite.c
-    public SpriteRoot CreateSprite(GameObject prefab) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/CreateSprite_prefab.c RVA 0x1575380
+    // 1-1 wrapper: CreateSprite(prefab, Vector3.zero, Quaternion.identity).
+    //   PTR_DAT_03446bc8 = Vector3.zero static (3 floats)
+    //   PTR_DAT_03446b08 = Quaternion.identity static (4 floats)
+    public SpriteRoot CreateSprite(GameObject prefab)
+    {
+        return CreateSprite(prefab, Vector3.zero, Quaternion.identity);
+    }
 
-    // RVA: 0x1575430  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/CreateSprite.c
-    public SpriteRoot CreateSprite(GameObject prefab, Vector3 position, Quaternion rotation) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/CreateSprite_prefab_pos_rot.c RVA 0x1575430
+    // 1-1:
+    //   GameObject newGO = (GameObject)Object.Instantiate(prefab, position, rotation);
+    //   if (newGO == null) throw NRE;
+    //   SpriteRoot sr = newGO.GetComponent<SpriteRoot>();
+    //   AddSprite(newGO);                                       // registers the prefab's SpriteRoot
+    //   return sr;                                              // cast already enforced by Ghidra klass-check
+    public SpriteRoot CreateSprite(GameObject prefab, Vector3 position, Quaternion rotation)
+    {
+        UnityEngine.GameObject newGO = (UnityEngine.GameObject)UnityEngine.Object.Instantiate(prefab, position, rotation);
+        if ((UnityEngine.Object)newGO == null) throw new System.NullReferenceException();
+        SpriteRoot sr = newGO.GetComponent<SpriteRoot>();
+        AddSprite(newGO);
+        return sr;
+    }
 
-    // RVA: 0x15755CC  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/RemoveSprite.c
-    public void RemoveSprite(SpriteRoot sprite) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/RemoveSprite_SpriteRoot.c RVA 0x15755CC
+    // 1-1:
+    //   if (sprite == null) throw NRE.
+    //   if (sprite.spriteMesh == null) return.
+    //   if (sprite.manager == this) {
+    //       sprite.manager = null;
+    //       sprite.addedToManager = false;
+    //   }
+    //   RemoveSprite((SpriteMesh_Managed)sprite.spriteMesh);
+    public void RemoveSprite(SpriteRoot sprite)
+    {
+        if ((UnityEngine.Object)sprite == null) throw new System.NullReferenceException();
+        if (sprite.spriteMesh == null) return;
+        if ((UnityEngine.Object)sprite.manager == this)
+        {
+            sprite.manager = null;
+            sprite.addedToManager = false;
+        }
+        RemoveSprite((SpriteMesh_Managed)sprite.spriteMesh);
+    }
 
     // RVA: 0x15756FC  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/RemoveSprite.c
     public void RemoveSprite(SpriteMesh_Managed sprite) { throw new System.NotImplementedException(); }

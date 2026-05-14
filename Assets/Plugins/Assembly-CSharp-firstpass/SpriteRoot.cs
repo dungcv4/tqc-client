@@ -38,7 +38,11 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 
 	public SpriteManager manager;
 
-	protected bool addedToManager;
+	// HAND-FIX visibility: dump.cs declares `protected bool addedToManager` but production IL2CPP
+	// doesn't enforce protected and SpriteManager (non-subclass, same assembly) writes this field
+	// directly inside AddSprite/RemoveSprite. Promoted to `internal` so the assembly-mate access
+	// compiles without restructuring the rest of the auto-gen stubs.
+	internal bool addedToManager;
 
 	public int drawLayer;
 
