@@ -188,7 +188,7 @@ public class SpriteAnimationPump : MonoBehaviour
 	{
 		get
 		{
-			if (UnityEngine.Object.op_Equality(instance, null))
+			if (instance == null)
 			{
 				GameObject gameObject = new GameObject("SpriteAnimationPump");
 				instance = gameObject.AddComponent<SpriteAnimationPump>();
