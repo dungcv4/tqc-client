@@ -221,14 +221,85 @@ public class PackedSprite : AutoSpriteBase
 		grown[grown.Length - 1] = anim;
 	}
 
-	// Source: Ghidra Aggregate.c RVA 0x01572A68 (366 lines)
-	// Extremely complex: walks textureAnimations, calls TextureAnim.Allocate, copies frames via
-	// CSpriteFrame.ctor, resolves GUID→path→Texture2D via delegates (param_2/param_3/param_4),
-	// accumulates List<Texture2D>+List<CSpriteFrame>, then assigns to spriteFrames+sourceTextures.
-	// TODO RVA 0x01572A68 — defer until delegate Invoke virtual slot mapping is stable.
+	// Source: Ghidra Aggregate.c RVA 0x01572A68
+	// 1-1: Resolve staticTexGUID/staticTexPath via guid2Path/path2Guid+load → add Texture2D to
+	// outTextures + _ser_stat_frame_info to outFrames. Then walk textureAnimations[]; for each
+	// TextureAnim, if guidCount > pathCount → resolve GUID→path→Texture2D per frame; else use
+	// framePaths directly. Accumulate Texture2D+CSpriteFrame into output. Assign sourceTextures
+	// = outTextures.ToArray(); spriteFrames = outFrames.ToArray().
 	public override void Aggregate(PathFromGUIDDelegate guid2Path, LoadAssetDelegate load, GUIDFromPathDelegate path2Guid)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		var outTextures = new System.Collections.Generic.List<Texture2D>();
+		var outFrames   = new System.Collections.Generic.List<CSpriteFrame>();
+		if (textureAnimations == null) throw new System.NullReferenceException();
+		// 1) Static-texture branch: resolve staticTexGUID + staticTexPath, append Texture+_ser_stat_frame_info.
+		if (!string.IsNullOrEmpty(staticTexPath) || !string.IsNullOrEmpty(staticTexGUID))
+		{
+			if (string.IsNullOrEmpty(staticTexGUID))
+			{
+				if (path2Guid == null) throw new System.NullReferenceException();
+				staticTexGUID = path2Guid(staticTexPath);
+			}
+			else
+			{
+				if (guid2Path == null) throw new System.NullReferenceException();
+				staticTexPath = guid2Path(staticTexGUID);
+			}
+			if (!string.IsNullOrEmpty(staticTexPath))
+			{
+				if (load == null) throw new System.NullReferenceException();
+				Texture2D tex = load(staticTexPath, typeof(Texture2D)) as Texture2D;
+				outTextures.Add(tex);
+				if (_ser_stat_frame_info != null) outFrames.Add(_ser_stat_frame_info);
+			}
+		}
+		// 2) Per-anim branch: walk textureAnimations[].
+		for (int ai = 0; ai < textureAnimations.Length; ai++)
+		{
+			TextureAnim anim = textureAnimations[ai];
+			if (anim == null) break;
+			anim.Allocate();
+			if (anim.frameGUIDs == null || anim.framePaths == null) continue;
+			int guidCount = anim.frameGUIDs.Length;
+			int pathCount = anim.framePaths.Length;
+			if (pathCount < guidCount)
+			{
+				// GUID-resolution path: build spriteFrames + framePaths buffers; resolve per GUID.
+				anim.spriteFrames = new CSpriteFrame[guidCount];
+				anim.framePaths   = new string[guidCount];
+				for (int fi = 0; fi < anim.spriteFrames.Length; fi++)
+				{
+					anim.spriteFrames[fi] = new CSpriteFrame();
+				}
+				for (int fi = 0; fi < anim.frameGUIDs.Length; fi++)
+				{
+					if (guid2Path == null) throw new System.NullReferenceException();
+					string path = guid2Path(anim.frameGUIDs[fi]);
+					anim.framePaths[fi] = path;
+					if (load == null) throw new System.NullReferenceException();
+					Texture2D tex = load(path, typeof(Texture2D)) as Texture2D;
+					outTextures.Add(tex);
+					outFrames.Add(anim.spriteFrames[fi]);
+				}
+			}
+			else
+			{
+				// Path-only path: each framePath[i] loads Texture2D directly.
+				for (int fi = 0; fi < pathCount; fi++)
+				{
+					if (load == null) throw new System.NullReferenceException();
+					Texture2D tex = load(anim.framePaths[fi], typeof(Texture2D)) as Texture2D;
+					outTextures.Add(tex);
+					if (anim.spriteFrames != null && fi < anim.spriteFrames.Length)
+					{
+						outFrames.Add(anim.spriteFrames[fi]);
+					}
+				}
+				anim.frameGUIDs = new string[0];
+			}
+		}
+		sourceTextures = outTextures.ToArray();
+		spriteFrames   = outFrames.ToArray();
 	}
 
 	// Source: Ghidra Create.c RVA 0x01573580
