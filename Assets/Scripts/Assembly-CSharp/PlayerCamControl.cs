@@ -103,14 +103,18 @@ public class PlayerCamControl : MonoBehaviour
         int iZ64 = iZ >> 6;
         float clampedX;
         float clampedZ;
-        // X-axis clamp
+        // X-axis clamp — Ghidra: in-range case keeps tX (NO CAMZ_DIS).
+        // CAMZ_DIS is the camera's Z offset BEHIND player (so camera looks toward
+        // player along forward direction). It is NOT added to X. Earlier port mistakenly
+        // added it to both axes; with CAMZ_DIS=-1050 that pushed camera 1050 left of
+        // player and player's viewport.x became 1.04 (off right edge).
         if (iX < 0x200 || (mapWidth - 8) < iX64)
         {
             clampedX = lastCameraX;
         }
         else
         {
-            clampedX = tX + CAMZ_DIS;
+            clampedX = tX;
         }
         // Z-axis clamp
         if (iZ64 < (8 - mapHeight) || -10 < iZ64)
