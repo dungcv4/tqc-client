@@ -163,36 +163,35 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 
 	public bool isMirror;
 
+	// Source: Ghidra get_Color.c RVA 0x01585434 — return color (offset 0x16c).
+	// set_Color: TODO RVA 0x01585444 — virtual ColorUpdateLogic chain, pending mapping.
 	public Color Color
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return color; }
 		set
 		{
 			throw new AnalysisFailedException("No IL was generated.");
 		}
 	}
 
+	// Source: Ghidra get_RenderCamera.c RVA 0x01585948 — return renderCamera (offset 0x1a0).
+	// set_RenderCamera: TODO — Ghidra body has camera-attach logic.
 	public virtual Camera RenderCamera
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return renderCamera; }
 		set
 		{
 			throw new AnalysisFailedException("No IL was generated.");
 		}
 	}
 
+	// Source: Ghidra get_PixelSize.c RVA 0x01585E44
+	// 1-1: return Vector2(width / pixelsPerUV.x, ...).
+	// Ghidra simplifies to single float — only the x-component visible. In C# return
+	// the full Vector2 derived from width/pixelsPerUV.
 	public Vector2 PixelSize
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return new Vector2(width / pixelsPerUV.x, height / pixelsPerUV.y); }
 		set
 		{
 			throw new AnalysisFailedException("No IL was generated.");
@@ -207,25 +206,20 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		}
 	}
 
+	// Source: Ghidra get_Managed.c RVA 0x01585E88 — return managed (offset 0x20).
+	// set_Managed: complex — see Ghidra RVA 0x01585E90 (Manager.RemoveSprite call + AddMesh).
+	// TODO for setter: implement Manager attach/detach logic.
 	public bool Managed
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return managed; }
 		set
 		{
 			throw new AnalysisFailedException("No IL was generated.");
 		}
 	}
 
-	public bool Started
-	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
-	}
+	// Source: Ghidra get_Started.c RVA 0x01586224 — return m_started (offset 0x15c).
+	public bool Started { get { return m_started; } }
 
 	public virtual Rect3D ClippingRect
 	{
@@ -239,43 +233,50 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		}
 	}
 
+	// Source: Ghidra get_Clipped.c RVA 0x01586A84 — return clipped (offset 0x158).
+	// set_Clipped: TODO — Ghidra has set body but typically `clipped = value; if changed CalcClip()`.
 	public virtual bool Clipped
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return clipped; }
 		set
 		{
 			throw new AnalysisFailedException("No IL was generated.");
 		}
 	}
 
+	// Source: Ghidra get_Anchor.c RVA 0x01586ADC / set_Anchor.c RVA 0x01586AE4
+	// 1-1 get: return anchor (offset 0x54).
+	// 1-1 set: anchor = value; CalcSize() (virtual at vtable+0x298 — SpriteRoot.CalcSize).
 	public ANCHOR_METHOD Anchor
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return anchor; }
 		set
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			anchor = value;
+			CalcSize();   // virtual on this (vtable+0x298) — resolves to SpriteRoot.CalcSize override chain
 		}
 	}
 
+	// Source: Ghidra get_UnclippedTopLeft.c RVA 0x01586B1C
+	// 1-1: if (!m_started) Awake();   // virtual call vtable+0x208 = SpriteRoot.Awake
+	//      return unclippedTopLeft;   // offset 0xd4
 	public Vector3 UnclippedTopLeft
 	{
 		get
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			if (!m_started) Awake();
+			return unclippedTopLeft;
 		}
 	}
 
+	// Source: Ghidra get_UnclippedBottomRight.c RVA 0x01586B50
+	// 1-1: if (!m_started) Awake(); return unclippedBottomRight; (Vector3 at offset 0xe0).
 	public Vector3 UnclippedBottomRight
 	{
 		get
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			if (!m_started) Awake();
+			return unclippedBottomRight;
 		}
 	}
 
@@ -295,52 +296,39 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		}
 	}
 
+	// Source: Ghidra get_spriteMesh.c RVA 0x01586DA0 — return m_spriteMesh (offset 0x180).
+	// set_spriteMesh: TODO RVA 0x01581BC4 (92 lines) — complex with sprite-attachment logic.
 	public ISpriteMesh spriteMesh
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return m_spriteMesh; }
 		set
 		{
 			throw new AnalysisFailedException("No IL was generated.");
 		}
 	}
 
+	// Source: Ghidra get_AddedToManager.c RVA 0x01586DA8 / set_AddedToManager.c RVA 0x01586DB0
+	// 1-1: return/assign addedToManager (offset 0x30, byte stored with mask 0x1).
 	public bool AddedToManager
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
-		set
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return addedToManager; }
+		set { addedToManager = value; }
 	}
 
+	// Source: Ghidra get_prev.c RVA 0x01586E38 / set_prev.c RVA 0x01586E40
+	// 1-1: return/assign m_prev (offset 0x188).
 	public ISpriteAnimatable prev
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
-		set
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return m_prev; }
+		set { m_prev = value; }
 	}
 
+	// Source: Ghidra get_next.c RVA 0x01586E50 / set_next.c RVA 0x01586E58
+	// 1-1: return/assign m_next (offset 0x190 = 400 decimal).
 	public ISpriteAnimatable next
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
-		set
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return m_next; }
+		set { m_next = value; }
 	}
 
 	protected virtual void Awake()
