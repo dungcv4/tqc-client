@@ -1406,10 +1406,15 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 			uvRect.y + uvSpace.y,
 			uvRect.width  + bleedCompensationUVMax.x,
 			uvRect.height + bleedCompensationUVMax.y);
-		if (m_spriteMesh != null)
-		{
-			m_spriteMesh.UpdateUVs();
-		}
+		// Ghidra SetBleedCompensation_1.c line 27 (RVA 0x0158622c):
+		//   (**(code **)(*param_3 + 0x308))(param_3, *(undefined8 *)(*param_3 + 0x310));
+		// vtable+0x308 on SpriteRoot = SpriteRoot.UpdateUVs (the SpriteRoot VIRTUAL method,
+		// not the SpriteMesh interface method). SpriteRoot.UpdateUVs runs SetMirror() which
+		// writes m_uvs from uvRect, then calls m_spriteMesh.UpdateUVs() to propagate to mesh.
+		// Previous port called m_spriteMesh.UpdateUVs() directly — that pushes the STALE m_uvs
+		// (default Vector2.zero) to mesh, so mesh UVs stayed at (0,0) for static-frame sprites
+		// like Shadow (no animation pump to set them).
+		UpdateUVs();   // SpriteRoot.UpdateUVs (virtual) — calls SetMirror + spriteMesh.UpdateUVs
 	}
 
 	// Source: Ghidra SetBleedCompensation_2.c RVA 0x015823F8 (identical body to _1)
