@@ -30,19 +30,47 @@ public class BinFileMgr
 		{ _binData = value; }
 	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/BinFileMgr/getEveData.c RVA 0x18CFE48
+	// 1-1 mapping:
+	//   if (_binData != null) return _binData._dataAry;   // *(this+0x10)+0x20
+	//   return new tageventDATA[0];                       // empty array fallback
+	// Used by WndForm_MainSMap.lua:131 `BinFileMgr.Instance:getEveData()` during setObjObject —
+	// previously returned `default` (null) which made Lua's `tageventDATAs.Length` raise
+	// "attempt to index local 'tageventDATAs' (a nil value)" and V_Create exploded.
 	public tageventDATA[] getEveData()
-	{ return default; }
+	{
+		if (_binData != null)
+		{
+			return _binData.dataAry;
+		}
+		return new tageventDATA[0];
+	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/BinFileMgr/setEveData.c RVA 0x18CFEA8
+	// 1-1 mapping:
+	//   if (_binData == null) throw NullReferenceException;
+	//   int levelID = _binData._levelID;                   // *(_binData+0x10)
+	//   _binData = new BinData(levelID, eventLis);         // ctor(int, List<tageventDATA>)
 	public void setEveData(List<tageventDATA> eventLis)
-	{ }
+	{
+		if (_binData == null) throw new System.NullReferenceException();
+		int levelID = _binData.levelID;
+		_binData = new BinData(levelID, eventLis);
+	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/BinFileMgr/newLevel.c RVA 0x18D00A4
+	// 1-1 mapping:
+	//   if (_binData != null) _binData = null;              // explicit null + GC write barrier
+	//   _binData = new BinData(levelID);                    // BinData..ctor(int)
+	// The explicit null assignment before re-assignment is a Cpp2IL convention; in C# the GC
+	// handles the write barrier automatically, so a single `_binData = new BinData(levelID)`
+	// is semantically identical.
 	public void newLevel(int levelID)
 	{
-		// Source: dump.cs — Ghidra .c not yet extracted (RVA 0x18D00A4).
-		// Ghidra loadLevel() invokes this BEFORE BinData.loadFile(). It's expected to allocate
-		// a fresh BinData(levelID). Without the actual decompile, we fall back to the (int) ctor
-		// which matches dump.cs: `public void .ctor(int levelID)` writes _levelID@0x10.
-		// TODO RVA 0x18D00A4 — decompile pending; behavior may include extra dataAry init.
+		if (_binData != null)
+		{
+			_binData = null;
+		}
 		_binData = new BinData(levelID);
 	}
 
