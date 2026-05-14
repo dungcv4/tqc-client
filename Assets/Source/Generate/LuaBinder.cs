@@ -214,6 +214,16 @@ public static class LuaBinder
 		UnityEngine_SceneManagement_SceneManagerWrap.Register(L);
 		L.EndModule();
 		L.BeginModule("UI");
+		// HAND-FIX: BaseMeshEffectWrap was never registered, but `BeginClass(GradientText,
+		// typeof(BaseMeshEffect))` (line 34) bound a placeholder empty metatable for
+		// BaseMeshEffect into LuaState.metaMap. Components inheriting from BaseMeshEffect
+		// (Shadow, ModifiedShadow, BoxOutline …) then hit that empty placeholder via
+		// GetMissMetaReference and lose their __index chain to UIBehaviour/Behaviour —
+		// so Lua `boxOutline.enabled = true` (Entity/NameTag.lua) raised
+		// "attempt to index field 'nameTextBoxOutline' (a userdata value)".
+		// Registering BaseMeshEffectWrap populates the placeholder with the proper class
+		// metatable whose __index walks UIBehaviour → MonoBehaviour → Behaviour.
+		UnityEngine_UI_BaseMeshEffectWrap.Register(L);
 		UnityEngine_UI_ButtonWrap.Register(L);
 		UnityEngine_UI_GridLayoutGroupWrap.Register(L);
 		UnityEngine_UI_HorizontalLayoutGroupWrap.Register(L);
