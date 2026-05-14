@@ -12,7 +12,9 @@ public class WndForm_LoadingScreenWrap
 		L.RegFunction("set_ShowLoadingPercent", set_ShowLoadingPercent);
 		L.RegFunction("SetBarText", SetBarText);
 		L.RegFunction("SetAdultImg", SetAdultImg);
-		L.RegFunction("set_CharacterLevel", set_CharacterLevel);
+		// Source: Ghidra WndForm_LoadingScreenWrap/Register.c RVA 0x01870638
+		// Original: RegVar("CharacterLevel", null, set_CharacterLevel) — property setter, not method
+		L.RegVar("CharacterLevel", null, set_CharacterLevel);
 		L.RegFunction("_onClickChangeTip", _onClickChangeTip);
 		L.RegFunction("GetPrefab", GetPrefab);
 		L.RegFunction("IsPrefabInResource", IsPrefabInResource);
@@ -154,13 +156,14 @@ public class WndForm_LoadingScreenWrap
 		}
 	}
 
+	// Source: Ghidra WndForm_LoadingScreenWrap/set_CharacterLevel.c RVA 0x01870510
+	// 1-1: luaL_checknumber(L, 2) — RegVar setter convention puts value at stack idx 2
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
 	static int set_CharacterLevel(IntPtr L)
 	{
 		try
 		{
-			ToLua.CheckArgsCount(L, 1);
-			int arg0 = (int)LuaDLL.luaL_checknumber(L, 1);
+			int arg0 = (int)LuaDLL.luaL_checknumber(L, 2);
 			WndForm_LoadingScreen.set_CharacterLevel(arg0);
 			return 0;
 		}
