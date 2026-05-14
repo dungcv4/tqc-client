@@ -48,28 +48,30 @@ public class PlayerCamControl : MonoBehaviour
     private void Start()
     {
         Instance = this;
-        Camera cam = WndRoot.uiCamera;
-        if (cam == null) throw new System.NullReferenceException();
+        // Source: Ghidra Start.c — reads static[+8]._field@0x58 = Main.s_instance._MainCamera (the WORLD game camera, NOT WndRoot.uiCamera).
+        Camera cam = (Main.Instance != null) ? Main.Instance._MainCamera : null;
+        // Ghidra panic if null — replaced with graceful skip so Editor doesn't crash if Main._MainCamera unbound.
+        if (cam == null) return;
         Transform t = cam.transform;
-        if (t == null) throw new System.NullReferenceException();
+        if (t == null) return;
         t.position = Vector3.zero;
 
-        cam = WndRoot.uiCamera;
-        if (cam == null) throw new System.NullReferenceException();
+        cam = (Main.Instance != null) ? Main.Instance._MainCamera : null;
+        if (cam == null) return;
         t = cam.transform;
-        if (t == null) throw new System.NullReferenceException();
+        if (t == null) return;
         t.rotation = CAM_QUATERNION;
 
-        cam = WndRoot.uiCamera;
-        if (cam == null) throw new System.NullReferenceException();
+        cam = (Main.Instance != null) ? Main.Instance._MainCamera : null;
+        if (cam == null) return;
         t = cam.transform;
-        if (t == null) throw new System.NullReferenceException();
+        if (t == null) return;
         t.localScale = Vector3.one;
 
-        cam = WndRoot.uiCamera;
-        if (cam == null) throw new System.NullReferenceException();
+        cam = (Main.Instance != null) ? Main.Instance._MainCamera : null;
+        if (cam == null) return;
         t = cam.transform;
-        if (t == null) throw new System.NullReferenceException();
+        if (t == null) return;
         Vector3 pos = t.position;
         lastCameraX = pos.x;
         lastCameraZ = pos.z;
@@ -85,15 +87,16 @@ public class PlayerCamControl : MonoBehaviour
     private void LateUpdate()
     {
         if (cameraTarget == null) return;
+        // Ghidra: `if (lVar9 != 0) { ... }` graceful skip on null Instance — not panic.
         WrdFileMgr wm = WrdFileMgr.Instance;
-        if (wm == null) throw new System.NullReferenceException();
+        if (wm == null) return;
         int mapWidth = wm.getMapWidth();
         wm = WrdFileMgr.Instance;
-        if (wm == null) throw new System.NullReferenceException();
+        if (wm == null) return;
         int mapHeight = wm.getMapHeight();
-        if (cameraTarget == null) throw new System.NullReferenceException();
+        if (cameraTarget == null) return;
         Transform tgtT = cameraTarget.transform;
-        if (tgtT == null) throw new System.NullReferenceException();
+        if (tgtT == null) return;
         Vector3 tgtPos = tgtT.position;
         float tX = tgtPos.x;
         float tZ = tgtPos.z;
@@ -155,10 +158,11 @@ public class PlayerCamControl : MonoBehaviour
         }
         lastCameraX = clampedX;
         lastCameraZ = clampedZ;
-        Camera uiCam = WndRoot.uiCamera;
-        if (uiCam == null) throw new System.NullReferenceException();
+        // Source: Ghidra LateUpdate.c line 123 — reads Main.s_instance._MainCamera (world camera), NOT WndRoot.uiCamera.
+        Camera uiCam = (Main.Instance != null) ? Main.Instance._MainCamera : null;
+        if (uiCam == null) return;
         Transform camT = uiCam.transform;
-        if (camT == null) throw new System.NullReferenceException();
+        if (camT == null) return;
         if (_ShakeNum > 0)
         {
             Vector3 shakeOff = ProcessShake(Time.deltaTime);
@@ -168,10 +172,10 @@ public class PlayerCamControl : MonoBehaviour
         {
             camT.position = new Vector3(clampedX, CAM_HEIGHT, clampedZ);
         }
-        uiCam = WndRoot.uiCamera;
-        if (uiCam == null) throw new System.NullReferenceException();
+        uiCam = (Main.Instance != null) ? Main.Instance._MainCamera : null;
+        if (uiCam == null) return;
         camT = uiCam.transform;
-        if (camT == null) throw new System.NullReferenceException();
+        if (camT == null) return;
         camT.rotation = CAM_QUATERNION;
         if (_FOVTime > 0f)
         {
@@ -193,9 +197,8 @@ public class PlayerCamControl : MonoBehaviour
     // Reads WndRoot static fields + 8 deref +0x58 — which is WndRoot.uiCamera (returns s_camera).
     public Camera GetMainCamera()
     {
-        Camera cam = WndRoot.uiCamera;
-        if (cam == null) throw new System.NullReferenceException();
-        return cam;
+        // Source: Ghidra Start.c — reads static[+8]._field@0x58 = Main.s_instance._MainCamera (the WORLD game camera, NOT WndRoot.uiCamera).
+        return (Main.Instance != null) ? Main.Instance._MainCamera : null;
     }
 
     // Source: Ghidra SetShake.c  RVA 0x18CB2C4
@@ -254,8 +257,9 @@ public class PlayerCamControl : MonoBehaviour
         if (time <= 0f) return;
         if (_FOVCurTime == 0f)
         {
-            Camera uiCam = WndRoot.uiCamera;
-            if (uiCam == null) throw new System.NullReferenceException();
+            // Source: Ghidra — reads Main.s_instance._MainCamera (world camera).
+            Camera uiCam = (Main.Instance != null) ? Main.Instance._MainCamera : null;
+            if (uiCam == null) return;
             _OldFOV = uiCam.fieldOfView;
         }
         if (fadeInTime <= 0f) fadeInTime = 0f;
@@ -313,14 +317,15 @@ public class PlayerCamControl : MonoBehaviour
                 }
             }
         }
-        Camera uiCam = WndRoot.uiCamera;
-        if (uiCam == null) throw new System.NullReferenceException();
+        // Source: Ghidra — reads Main.s_instance._MainCamera (world camera).
+        Camera uiCam = (Main.Instance != null) ? Main.Instance._MainCamera : null;
+        if (uiCam == null) return;
         Camera[] cams = uiCam.GetComponentsInChildren<Camera>();
-        if (cams == null) throw new System.NullReferenceException();
+        if (cams == null) return;
         for (int i = 0; i < cams.Length; i++)
         {
             Camera c = cams[i];
-            if (c == null) throw new System.NullReferenceException();
+            if (c == null) continue;
             c.fieldOfView = useFov;
         }
     }

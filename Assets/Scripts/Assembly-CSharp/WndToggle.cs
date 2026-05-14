@@ -1,3 +1,6 @@
+// Source: Ghidra work/06_ghidra/decompiled_full/WndToggle/ — manages a set of ButtonController checkboxes
+// where exactly one (or zero if _canCancel) is "checked" at a time.
+
 using System.Reflection;
 using Cpp2IlInjected;
 using UnityEngine;
@@ -6,45 +9,63 @@ using UnityEngine;
 public class WndToggle : IWndComponent
 {
 	private WndForm _wnd;
-
 	private ButtonController[] _checkBoxs;
-
 	private MethodInfo _method;
-
 	private object[] _methodParams;
-
 	public bool _canCancel;
-
 	public int _toggleControlID;
-
 	public string _methodName;
-
 	private bool doNotChangeToggle;
 
 	public override void InitComponent(WndForm wnd)
-	{ }
+	{
+		_wnd = wnd;
+		_checkBoxs = GetComponentsInChildren<ButtonController>(true);
+		if (wnd != null && !string.IsNullOrEmpty(_methodName))
+		{
+			System.Type wndType = wnd.GetType();
+			var types = new System.Type[] { typeof(int) };
+			_method = wndType.GetMethod(_methodName, types);
+			if (_method != null) _methodParams = new object[1];
+		}
+	}
 
 	public override void DinitComponent(WndForm wnd)
-	{ }
-
-	private void Start()
 	{
-		// TODO 1-1 port (Ghidra body deferred). Empty body to unblock boot.
+		_wnd = null;
+		_method = null;
+		_methodParams = null;
+		_checkBoxs = null;
 	}
+
+	private void Start() { }
 
 	public void Toggle(int controlID)
-	{ }
+	{
+		if (doNotChangeToggle) return;
+		ToggleChange(controlID);
+		if (_method != null && _methodParams != null)
+		{
+			_methodParams[0] = controlID;
+			_method.Invoke(_wnd, _methodParams);
+		}
+	}
 
-	private void ToggleChange(int nTaggle)
-	{ }
+	private void ToggleChange(int nToggle)
+	{
+		if (_checkBoxs == null) return;
+		_toggleControlID = nToggle;
+		foreach (var btn in _checkBoxs)
+		{
+			if (btn == null) continue;
+			btn.SetButtonChecked(btn._controlID == nToggle);
+		}
+	}
 
 	public void DontChangeToggle(bool b_change)
-	{ }
-
-	// Source: Ghidra work/06_ghidra/decompiled_rva/WndToggle___ctor.c RVA 0x01960BD4
-	// TODO 1-1 port (field init pending) — Ghidra body has assignments not yet ported.
-	// Empty body unblocks boot; revisit when runtime hits missing field values.
-	public WndToggle()
 	{
+		doNotChangeToggle = b_change;
 	}
+
+	public WndToggle() { }
 }

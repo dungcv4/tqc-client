@@ -669,6 +669,13 @@ public class ProxyWndForm : IWndForm
     // Source: Ghidra work/06_ghidra/decompiled_full/ProxyWndForm/SetActive.c RVA 0x019637f8
     public void SetActive(bool value)
     {
+        // [PROXY-LOG] EDITOR DIAG: only log on STATE CHANGE (skip no-op same-value calls).
+        // _name is "WndFormProxy" for all layers; disambiguate by depth (Layer_Main = 3000).
+        bool prev = (_root != null) ? _root.activeSelf : true;
+        if (prev != value)
+        {
+            UnityEngine.Debug.Log("[PROXY-LOG] depth=" + _nStartDepth + " " + prev + "→" + value);
+        }
         if (_root != null)
         {
             _root.SetActive(value);

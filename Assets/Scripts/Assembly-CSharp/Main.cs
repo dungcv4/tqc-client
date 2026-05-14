@@ -632,9 +632,9 @@ public class Main : MonoBehaviour
         }
         DetectEscape();
         // Source: Ghidra calls CProcManager__Update on GameProcMgr.Instance (singleton extends CProcManager)
+        // Ghidra panics if Instance == null (FUN_015cb8fc) — graceful skip in Editor instead of crash-every-frame.
         var cpm = GameProcMgr.Instance;
-        if (cpm == null) throw new System.NullReferenceException();
-        cpm.Update(UnityEngine.Time.deltaTime);
+        if (cpm != null) cpm.Update(UnityEngine.Time.deltaTime);
         // Source: Ghidra loops up to 11 entries of _proxyWndforms[i], calling ProxyWndForm.Update(deltaTime) each non-null
         if (_proxyWndforms != null)
         {
@@ -652,6 +652,7 @@ public class Main : MonoBehaviour
         // HAND-ADDED DIAGNOSTIC (not from Ghidra) — one-shot in-map state dump 60 frames after a
         // `stage*` scene becomes active. Removable by deleting this line + InMapStateLogger.cs.
         InMapStateLogger.TickFromMainUpdate();
+        InMapStateLogger.TickInputProbe();
     }
 
     // Source: Ghidra work/06_ghidra/decompiled_full/Main/FixedUpdate.c RVA 0x015B80E0

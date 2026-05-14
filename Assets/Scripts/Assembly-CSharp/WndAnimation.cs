@@ -1,3 +1,6 @@
+// Source: Ghidra work/06_ghidra/decompiled_full/WndAnimation/ — base class for all Wnd*Animation subclasses.
+// Properties are simple get/set, isPlaying is virtual.
+
 using Cpp2IlInjected;
 using UnityEngine;
 
@@ -21,47 +24,39 @@ public abstract class WndAnimation : MonoBehaviour
 
 	public bool auto
 	{
-		get
-		{ return default; }
-		set
-		{ }
+		get { return _auto; }
+		set { _auto = value; }
 	}
 
 	public bool loop
 	{
-		get
-		{ return default; }
-		set
-		{ }
+		get { return _loop; }
+		set { _loop = value; }
 	}
 
 	public float onceDuration
 	{
-		get
-		{ return default; }
-		set
-		{ }
+		get { return _onceDuration; }
+		set { _onceDuration = value; }
 	}
 
 	public float duration
 	{
-		get
-		{ return default; }
-		set
-		{ }
+		get { return _duration; }
+		set { _duration = value; }
 	}
 
 	public virtual bool isPlaying
 	{
-		get
-		{ return default; }
+		get { return _isPlaying; }
 	}
 
 	public abstract void PlayAnimation();
 
 	public virtual void StopAnimation()
-	{ }
+	{
+		_isPlaying = false;
+	}
 
-	protected WndAnimation()
-	{ }
+	protected WndAnimation() { }
 }

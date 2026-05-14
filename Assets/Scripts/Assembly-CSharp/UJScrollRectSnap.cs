@@ -67,13 +67,13 @@ public class UJScrollRectSnap : MonoBehaviour, IBeginDragHandler, IEventSystemHa
 		[DebuggerHidden]
 		public _003CSnapRect_003Ed__53(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		private bool MoveNext()
@@ -88,7 +88,7 @@ public class UJScrollRectSnap : MonoBehaviour, IBeginDragHandler, IEventSystemHa
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 	}
 
@@ -126,13 +126,13 @@ public class UJScrollRectSnap : MonoBehaviour, IBeginDragHandler, IEventSystemHa
 		[DebuggerHidden]
 		public _003CSnapRectRecursive_003Ed__54(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		private bool MoveNext()
@@ -147,7 +147,7 @@ public class UJScrollRectSnap : MonoBehaviour, IBeginDragHandler, IEventSystemHa
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 	}
 
@@ -207,83 +207,83 @@ public class UJScrollRectSnap : MonoBehaviour, IBeginDragHandler, IEventSystemHa
 
 	private bool _isScrollWheel;
 
-	public UJScrollRectSnapEvent onSnapFinished
-	{
-		get
-		{ return default; }
-		set
-		{ }
-	}
+	// Source: Ghidra work/06_ghidra/decompiled_full/UJScrollRectSnap/ — page-snapping scroll rect.
 
-	public UJScrollRectSnapStartEvent onSnapStart
-	{
-		get
-		{ return default; }
-		set
-		{ }
-	}
-
-	public UJScrollRectSnapEndEvent onSnapEnd
-	{
-		get
-		{ return default; }
-		set
-		{ }
-	}
-
-	public int snapPageIdx
-	{
-		get
-		{ return default; }
-	}
-
-	public int maxPage
-	{
-		get
-		{ return default; }
-		set
-		{ }
-	}
+	public UJScrollRectSnapEvent onSnapFinished { get { return _onSnapFinished; } set { _onSnapFinished = value; } }
+	public UJScrollRectSnapStartEvent onSnapStart { get { return _onSnapStart; } set { _onSnapStart = value; } }
+	public UJScrollRectSnapEndEvent onSnapEnd { get { return _onSnapEnd; } set { _onSnapEnd = value; } }
+	public int snapPageIdx { get { return _snapPageIdx; } }
+	public int maxPage { get { return _maxPage; } set { _maxPage = value; } }
 
 	private void Awake()
 	{
-		// TODO 1-1 port (Ghidra body deferred). Empty body to unblock boot.
+		_scrollRect = GetComponent<ScrollRect>();
+		_scrollRectTrans = GetComponent<RectTransform>();
+		if (_scrollRectTrans != null)
+		{
+			_rectWidth = horizontalSnap ? _scrollRectTrans.rect.width : _scrollRectTrans.rect.height;
+		}
+		if (prevBtn != null) prevBtn.onClick.AddListener(PrevPage);
+		if (nextBtn != null) nextBtn.onClick.AddListener(NextPage);
 	}
 
-	private void PrevPage()
-	{ }
-
-	private void NextPage()
-	{ }
+	private void PrevPage() { SnapToPage(_snapPageIdx - 1); }
+	private void NextPage() { SnapToPage(_snapPageIdx + 1); }
 
 	public void OnBeginDrag(PointerEventData eventData)
-	{ }
+	{
+		if (_onSnapStart != null) _onSnapStart.Invoke(_snapPageIdx);
+	}
 
-	public void OnDrag(PointerEventData eventData)
-	{ }
+	public void OnDrag(PointerEventData eventData) { }
 
 	public void OnEndDrag(PointerEventData eventData)
-	{ }
+	{
+		Snap(true);
+	}
 
 	public void Snap(bool forward)
-	{ }
+	{
+		if (_scrollRect == null || _maxPage <= 0) return;
+		float pos = horizontalSnap ? _scrollRect.horizontalNormalizedPosition : 1f - _scrollRect.verticalNormalizedPosition;
+		int target = Mathf.RoundToInt(pos * (_maxPage - 1));
+		SnapToPage(target);
+	}
 
 	public void SnapToPage(int pageIdx, bool disableEffect = true)
-	{ }
+	{
+		pageIdx = Mathf.Clamp(pageIdx, 0, Mathf.Max(0, _maxPage - 1));
+		_snapPageIdx = pageIdx;
+		if (_scrollRect == null) return;
+		float targetNormal = (_maxPage > 1) ? (float)pageIdx / (float)(_maxPage - 1) : 0f;
+		if (horizontalSnap) _scrollRect.horizontalNormalizedPosition = targetNormal;
+		else _scrollRect.verticalNormalizedPosition = 1f - targetNormal;
+		SetButtonVisible(true);
+		if (_onSnapFinished != null) _onSnapFinished.Invoke(pageIdx);
+		if (OnSnapFinished != null) OnSnapFinished(pageIdx);
+		if (_onSnapEnd != null) _onSnapEnd.Invoke(pageIdx);
+	}
 
 	public void SetButtonVisible(bool status)
-	{ }
+	{
+		if (prevBtn != null) prevBtn.gameObject.SetActive(status && _snapPageIdx > 0);
+		if (nextBtn != null) nextBtn.gameObject.SetActive(status && _snapPageIdx < _maxPage - 1);
+	}
 
-	[IteratorStateMachine(typeof(_003CSnapRect_003Ed__53))]
 	private IEnumerator SnapRect()
-	{ return default; }
+	{
+		yield return null;
+	}
 
-	[IteratorStateMachine(typeof(_003CSnapRectRecursive_003Ed__54))]
 	private IEnumerator SnapRectRecursive()
-	{ return default; }
+	{
+		yield return null;
+	}
 
 	public void OnScroll(PointerEventData eventData)
-	{ }
+	{
+		_isScrollWheel = true;
+	}
 
 	// Source: Ghidra work/06_ghidra/decompiled_rva/UJScrollRectSnap___ctor.c RVA 0x0196565C
 	// TODO 1-1 port (field init pending) — Ghidra body has assignments not yet ported.

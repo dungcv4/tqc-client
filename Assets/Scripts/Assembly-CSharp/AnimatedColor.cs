@@ -1,3 +1,6 @@
+// Source: Ghidra work/06_ghidra/decompiled_full/AnimatedColor/ — applies a serialized color to a Graphic in LateUpdate
+// (used by Animator-driven animation curves that write to this.color).
+
 using Cpp2IlInjected;
 using UnityEngine;
 using UnityEngine.UI;
@@ -6,19 +9,17 @@ using UnityEngine.UI;
 public class AnimatedColor : MonoBehaviour
 {
 	public Color color;
-
 	private Graphic mWidget;
 
 	private void OnEnable()
-	{ }
+	{
+		mWidget = GetComponent<Graphic>();
+	}
 
 	private void LateUpdate()
-	{ }
-
-	// Source: Ghidra work/06_ghidra/decompiled_rva/AnimatedColor___ctor.c RVA 0x01966164
-	// TODO 1-1 port (field init pending) — Ghidra body has assignments not yet ported.
-	// Empty body unblocks boot; revisit when runtime hits missing field values.
-	public AnimatedColor()
 	{
+		if (mWidget != null) mWidget.color = color;
 	}
+
+	public AnimatedColor() { color = Color.white; }
 }

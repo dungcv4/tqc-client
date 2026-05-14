@@ -2903,9 +2903,9 @@ public class BaseProcLua : CBaseProc
         set
         {
             Main.bScreenHalfPixel = value;
+            // Ghidra panics if Main.Instance==null; graceful skip in Editor (matches if-not-null pattern).
             Main main = Main.Instance;
-            if (main == null) throw new NullReferenceException();
-            main.SetupScreenSize();
+            if (main != null) main.SetupScreenSize();
         }
     }
 

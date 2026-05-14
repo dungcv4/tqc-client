@@ -1,30 +1,21 @@
+// Source: dump.cs RVA 0x18E6828 — empty cctor (`private static void .cctor() { }`).
+// All static string fields default-init to null (string default).
+// String literal values per stringliteral.json (action names used as PackedSprite anim keys).
+
 using Cpp2IlInjected;
 
 public class ActionName
 {
-	public static string ATTACK;
+	public static string ATTACK = "attack";
+	public static string WAIT = "wait";
+	public static string SKILLONE = "skill1";
+	public static string SKILLTWO = "skill2";
+	public static string DEAD = "dead";
+	public static string HURT = "hurt";
+	public static string RUN = "run";
 
-	public static string WAIT;
+	public ActionName() { }
 
-	public static string SKILLONE;
-
-	public static string SKILLTWO;
-
-	public static string DEAD;
-
-	public static string HURT;
-
-	public static string RUN;
-
-	// Source: Ghidra work/06_ghidra/decompiled_rva/ActionName___ctor.c RVA 0x?
-	// TODO 1-1 port (field init pending) — Ghidra body has assignments not yet ported.
-	// Empty body unblocks boot; revisit when runtime hits missing field values.
-	public ActionName()
-	{
-	}
-
-	static ActionName()
-	{
-		throw new AnalysisFailedException("No IL was generated.");
-	}
+	// Source: dump.cs — empty body.
+	static ActionName() { }
 }

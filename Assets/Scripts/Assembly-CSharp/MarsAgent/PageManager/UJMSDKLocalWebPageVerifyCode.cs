@@ -1,3 +1,9 @@
+// Source: dump.cs — UJMSDKLocalWebPageVerifyCode (TypeDefIndex 1255).
+// cctor RVA 0x19F7820 (4 bytes — empty / just ret) → empty body.
+// Instance getter RVA 0x19F7824 (256 bytes) — pattern likely lazy Resources.Load; no Ghidra .c yet.
+// Instance setter RVA 0x19F7924 (104 bytes) — _instance = value; possibly DontDestroyOnLoad; no Ghidra .c yet.
+// VerifyWebPage RVA 0x19F798C (8 bytes — `mov w0, #x; ret`); no Ghidra .c yet.
+
 using System;
 using Cpp2IlInjected;
 using UnityEngine;
@@ -41,21 +47,18 @@ namespace MarsAgent.PageManager
 
 		public static UJMSDKLocalWebPageVerifyCode Instance
 		{
-			get
-			{ return default; }
-			set
-			{ }
+			// TODO: Ghidra RVA 0x19F7824 not yet decompiled. Probable: lazy Resources.Load("MarsSDK/LocalWebPageVerifyCode").
+			get { return _instance; }
+			// TODO: Ghidra RVA 0x19F7924 not yet decompiled.
+			set { _instance = value; }
 		}
 
-		static UJMSDKLocalWebPageVerifyCode()
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		// Source: dump.cs cctor RVA 0x19F7820 — empty (4-byte ret).
+		static UJMSDKLocalWebPageVerifyCode() { }
 
-		public bool VerifyWebPage(string fileName)
-		{ return default; }
+		// TODO: Ghidra RVA 0x19F798C not yet decompiled. 8-byte body — likely `return false;` or `return true;`.
+		public bool VerifyWebPage(string fileName) { return false; }
 
-		public UJMSDKLocalWebPageVerifyCode()
-		{ }
+		public UJMSDKLocalWebPageVerifyCode() { }
 	}
 }

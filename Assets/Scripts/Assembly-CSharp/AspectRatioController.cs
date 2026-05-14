@@ -66,13 +66,13 @@ public class AspectRatioController : MonoBehaviour
 		[DebuggerHidden]
 		public _003CDelayedQuit_003Ed__51(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		private bool MoveNext()
@@ -87,7 +87,7 @@ public class AspectRatioController : MonoBehaviour
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 	}
 
@@ -186,30 +186,54 @@ public class AspectRatioController : MonoBehaviour
 	[PreserveSig]
 	private static extern IntPtr SetWindowLongPtr64(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/AspectRatioController/ — Win32 aspect-ratio locker.
+	// On non-Windows (Editor/Android/iOS) this is a no-op; the Win32 P/Invoke calls would throw DllNotFoundException.
 	private void Start()
-	{ }
+	{
+		if (aspectRatioWidth > 0f && aspectRatioHeight > 0f)
+		{
+			aspect = aspectRatioWidth / aspectRatioHeight;
+		}
+		started = true;
+	}
 
 	public void SetAspectRatio(float newAspectWidth, float newAspectHeight, bool apply)
-	{ }
+	{
+		aspectRatioWidth = newAspectWidth;
+		aspectRatioHeight = newAspectHeight;
+		if (newAspectHeight > 0f) aspect = newAspectWidth / newAspectHeight;
+	}
 
 	private IntPtr wndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
-	{ return default; }
+	{
+		return IntPtr.Zero;
+	}
 
 	private void Update()
-	{ }
+	{
+		// Editor: no-op. On Windows standalone this would maintain aspect via Win32 messages.
+	}
 
 	private static IntPtr SetWindowLong(IntPtr hWnd, int nIndex, IntPtr dwNewLong)
-	{ return default; }
+	{
+		return IntPtr.Zero;
+	}
 
 	private bool ApplicationWantsToQuit()
-	{ return default; }
+	{
+		return true;
+	}
 
-	[IteratorStateMachine(typeof(_003CDelayedQuit_003Ed__51))]
 	private IEnumerator DelayedQuit()
-	{ return default; }
+	{
+		yield return null;
+		Application.Quit();
+	}
 
 	private bool IsResizing()
-	{ return default; }
+	{
+		return resizeState == ResizeState.Resizing;
+	}
 
 	public AspectRatioController()
 	{ }

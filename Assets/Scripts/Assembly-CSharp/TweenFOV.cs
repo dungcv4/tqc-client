@@ -1,3 +1,5 @@
+// Source: Ghidra work/06_ghidra/decompiled_full/TweenFOV/ (all 1-1)
+
 using Cpp2IlInjected;
 using UnityEngine;
 
@@ -14,39 +16,52 @@ public class TweenFOV : UITweener
 	public Camera cachedCamera
 	{
 		get
-		{ return default; }
+		{
+			if (mCam == null) mCam = GetComponent<Camera>();
+			return mCam;
+		}
 	}
 
 	public float value
 	{
 		get
-		{ return default; }
+		{
+			if (cachedCamera == null) throw new System.NullReferenceException();
+			return cachedCamera.fieldOfView;
+		}
 		set
-		{ }
+		{
+			if (cachedCamera == null) throw new System.NullReferenceException();
+			cachedCamera.fieldOfView = value;
+		}
 	}
 
 	protected override void OnUpdate(float factor, bool isFinished)
-	{ }
+	{
+		value = (1f - factor) * from + to * factor;
+	}
 
 	public static TweenFOV Begin(GameObject go, float duration, float to)
-	{ return default; }
+	{
+		TweenFOV c = UITweener.Begin<TweenFOV>(go, duration);
+		if (c == null) throw new System.NullReferenceException();
+		c.from = c.value;
+		c.to = to;
+		if (duration <= 0f) { c.Sample(1f, true); c.enabled = false; }
+		return c;
+	}
 
 	[ContextMenu("Set 'From' to current value")]
-	public override void SetStartToCurrentValue()
-	{ }
+	public override void SetStartToCurrentValue() { from = value; }
 
 	[ContextMenu("Set 'To' to current value")]
-	public override void SetEndToCurrentValue()
-	{ }
+	public override void SetEndToCurrentValue() { to = value; }
 
 	[ContextMenu("Assume value of 'From'")]
-	private void SetCurrentValueToStart()
-	{ }
+	private void SetCurrentValueToStart() { value = from; }
 
 	[ContextMenu("Assume value of 'To'")]
-	private void SetCurrentValueToEnd()
-	{ }
+	private void SetCurrentValueToEnd() { value = to; }
 
-	public TweenFOV()
-	{ }
+	public TweenFOV() { }
 }

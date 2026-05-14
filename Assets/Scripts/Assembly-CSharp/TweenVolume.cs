@@ -1,3 +1,6 @@
+// Source: Ghidra work/06_ghidra/decompiled_full/TweenVolume/ (all 1-1)
+// Field offsets: from@0x80, to@0x84, mSource@0x88 (AudioSource)
+
 using System;
 using Cpp2IlInjected;
 using UnityEngine;
@@ -17,38 +20,50 @@ public class TweenVolume : UITweener
 	public AudioSource audioSource
 	{
 		get
-		{ return default; }
+		{
+			if (mSource == null) mSource = GetComponent<AudioSource>();
+			return mSource;
+		}
 	}
 
 	[Obsolete("Use 'value' instead")]
 	public float volume
 	{
-		get
-		{ return default; }
-		set
-		{ }
+		get { return value; }
+		set { this.value = value; }
 	}
 
 	public float value
 	{
 		get
-		{ return default; }
+		{
+			if (audioSource == null) return 0f;
+			return mSource.volume;
+		}
 		set
-		{ }
+		{
+			if (audioSource == null) return;
+			mSource.volume = value;
+		}
 	}
 
 	protected override void OnUpdate(float factor, bool isFinished)
-	{ }
+	{
+		value = (1f - factor) * from + to * factor;
+	}
 
 	public static TweenVolume Begin(GameObject go, float duration, float targetVolume)
-	{ return default; }
+	{
+		TweenVolume c = UITweener.Begin<TweenVolume>(go, duration);
+		if (c == null) throw new System.NullReferenceException();
+		c.from = c.value;
+		c.to = targetVolume;
+		if (duration <= 0f) { c.Sample(1f, true); c.enabled = false; }
+		return c;
+	}
 
-	public override void SetStartToCurrentValue()
-	{ }
+	public override void SetStartToCurrentValue() { from = value; }
+	public override void SetEndToCurrentValue() { to = value; }
 
-	public override void SetEndToCurrentValue()
-	{ }
-
-	public TweenVolume()
-	{ }
+	public TweenVolume() { }
 }

@@ -51,13 +51,13 @@ public class SpriteManagerPool : MonoBehaviour
 		[DebuggerHidden]
 		public _003CgetShadowSpriteMgr_003Ed__31(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		private bool MoveNext()
@@ -72,7 +72,7 @@ public class SpriteManagerPool : MonoBehaviour
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 	}
 
@@ -112,13 +112,13 @@ public class SpriteManagerPool : MonoBehaviour
 		[DebuggerHidden]
 		public _003CgetShadowSpritePrefab_003Ed__32(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		private bool MoveNext()
@@ -133,7 +133,7 @@ public class SpriteManagerPool : MonoBehaviour
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 	}
 
@@ -173,13 +173,13 @@ public class SpriteManagerPool : MonoBehaviour
 		[DebuggerHidden]
 		public _003CgetSpriteMgr_003Ed__23(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		private bool MoveNext()
@@ -194,7 +194,7 @@ public class SpriteManagerPool : MonoBehaviour
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 	}
 
@@ -234,13 +234,13 @@ public class SpriteManagerPool : MonoBehaviour
 		[DebuggerHidden]
 		public _003CgetSpritePrefab_003Ed__24(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 
 		private bool MoveNext()
@@ -255,7 +255,7 @@ public class SpriteManagerPool : MonoBehaviour
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			/* compiler-gen state machine — iterator inlined elsewhere; no-op */
 		}
 	}
 

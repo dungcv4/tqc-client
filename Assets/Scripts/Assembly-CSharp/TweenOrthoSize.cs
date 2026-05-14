@@ -1,3 +1,5 @@
+// Source: Ghidra work/06_ghidra/decompiled_full/TweenOrthoSize/ (all 1-1)
+
 using Cpp2IlInjected;
 using UnityEngine;
 
@@ -14,29 +16,43 @@ public class TweenOrthoSize : UITweener
 	public Camera cachedCamera
 	{
 		get
-		{ return default; }
+		{
+			if (mCam == null) mCam = GetComponent<Camera>();
+			return mCam;
+		}
 	}
 
 	public float value
 	{
 		get
-		{ return default; }
+		{
+			if (cachedCamera == null) throw new System.NullReferenceException();
+			return cachedCamera.orthographicSize;
+		}
 		set
-		{ }
+		{
+			if (cachedCamera == null) throw new System.NullReferenceException();
+			cachedCamera.orthographicSize = value;
+		}
 	}
 
 	protected override void OnUpdate(float factor, bool isFinished)
-	{ }
+	{
+		value = (1f - factor) * from + to * factor;
+	}
 
 	public static TweenOrthoSize Begin(GameObject go, float duration, float to)
-	{ return default; }
+	{
+		TweenOrthoSize c = UITweener.Begin<TweenOrthoSize>(go, duration);
+		if (c == null) throw new System.NullReferenceException();
+		c.from = c.value;
+		c.to = to;
+		if (duration <= 0f) { c.Sample(1f, true); c.enabled = false; }
+		return c;
+	}
 
-	public override void SetStartToCurrentValue()
-	{ }
+	public override void SetStartToCurrentValue() { from = value; }
+	public override void SetEndToCurrentValue() { to = value; }
 
-	public override void SetEndToCurrentValue()
-	{ }
-
-	public TweenOrthoSize()
-	{ }
+	public TweenOrthoSize() { }
 }

@@ -52,6 +52,133 @@ public static class InMapStateLogger
 
         _snapshotDone = true;
         DumpState();
+        DumpAllCanvases();
+    }
+
+    // [CANVAS-LOG] Dump every Canvas in scene with mode, camera, parent, enabled.
+    static void DumpAllCanvases()
+    {
+        var sb = new StringBuilder(1024);
+        sb.AppendLine("==== [CanvasDump] All Canvas components ====");
+        Canvas[] all = Resources.FindObjectsOfTypeAll<Canvas>();
+        foreach (var c in all)
+        {
+            if (c == null) continue;
+            if (c.gameObject.scene.name == null) continue;  // skip prefab assets
+            string path = c.gameObject.name;
+            Transform pt = c.transform.parent;
+            while (pt != null) { path = pt.name + "/" + path; pt = pt.parent; }
+            sb.Append("  ").Append(path)
+              .Append("  scene=").Append(c.gameObject.scene.name)
+              .Append(" enabled=").Append(c.enabled)
+              .Append(" mode=").Append(c.renderMode)
+              .Append(" camera=").Append(c.worldCamera != null ? c.worldCamera.name : "null")
+              .Append(" sortOrder=").Append(c.sortingOrder)
+              .Append(" overrideSorting=").Append(c.overrideSorting)
+              .AppendLine();
+        }
+        sb.AppendLine("==== END CanvasDump ====");
+        UnityEngine.Debug.Log(sb.ToString());
+    }
+
+    // [INPUT-LOG] Called every frame from Main.Update AFTER snapshot done.
+    // Logs at most once per 30 frames + only on state CHANGE to keep log clean.
+    private static int  _inputLogCooldown = 0;
+    private static bool _wasDown = false;
+    private static int  _lastTouchCount = -1;
+    public static void TickInputProbe()
+    {
+        if (!INMAP_LOG_ENABLED) return;
+        if (!_snapshotDone) return;
+
+        _inputLogCooldown++;
+
+        bool downNow   = UnityEngine.Input.GetMouseButton(0);
+        bool downStart = UnityEngine.Input.GetMouseButtonDown(0);
+        bool downEnd   = UnityEngine.Input.GetMouseButtonUp(0);
+        int  touchCnt  = UnityEngine.Input.touchCount;
+        Vector3 mp     = UnityEngine.Input.mousePosition;
+
+        // Only emit when state changes OR every 60 frames if button held.
+        bool stateChanged = (downNow != _wasDown) || (touchCnt != _lastTouchCount) || downStart || downEnd;
+        bool periodicWhileDown = downNow && _inputLogCooldown >= 60;
+
+        if (stateChanged || periodicWhileDown)
+        {
+            bool overUI = false;
+            try { overUI = BaseProcLua.PointIsOverUI(new Vector2(mp.x, mp.y)); } catch { }
+
+            // Probe WndForm_Joystick state via GameObject.Find.
+            GameObject joyParent = GameObject.Find("WndForm_Joystick(Clone)");
+            string joyState = "missing";
+            if (joyParent != null)
+            {
+                Transform jb = joyParent.transform.Find("Joystick_bak");
+                if (jb != null)
+                {
+                    var rt = jb as RectTransform;
+                    if (rt == null) rt = jb.GetComponent<RectTransform>();
+                    string posInfo = "";
+                    if (rt != null)
+                    {
+                        posInfo = " anch=" + rt.anchoredPosition.ToString("F0")
+                              + " size=" + rt.sizeDelta.ToString("F0")
+                              + " scale=" + rt.localScale.ToString("F2");
+                    }
+                    var cg = jb.GetComponent<CanvasGroup>();
+                    string cgInfo = (cg != null) ? (" cg.alpha=" + cg.alpha) : "";
+                    // Probe first Image child for alpha
+                    var img = jb.GetComponentInChildren<UnityEngine.UI.Image>(true);
+                    string imgInfo = "";
+                    if (img != null)
+                    {
+                        var c = img.color;
+                        string spriteName = (img.sprite != null) ? img.sprite.name : "NULL";
+                        string matName = (img.material != null) ? img.material.name : "NULL";
+                        imgInfo = " 1stImg=" + img.gameObject.name + " sprite=" + spriteName + " mat=" + matName + " color=(" + c.r.ToString("F1") + "," + c.g.ToString("F1") + "," + c.b.ToString("F1") + ",α=" + c.a.ToString("F2") + ") enabled=" + img.enabled + " geomActive=" + img.canvasRenderer.cull;
+                    }
+                    // WORLD-SPACE position (in case Canvas is WorldSpace + UICamera frustum mismatch).
+                    string worldInfo = "";
+                    if (rt != null)
+                    {
+                        Vector3 wp = rt.position;
+                        worldInfo = " WORLDpos=" + wp.ToString("F1");
+                        // Find UICamera and test visibility.
+                        Camera uiCam = null;
+                        foreach (Camera c in Camera.allCameras)
+                        {
+                            if (c.gameObject.name == "UICamera") { uiCam = c; break; }
+                        }
+                        if (uiCam != null)
+                        {
+                            Vector3 vp = uiCam.WorldToViewportPoint(wp);
+                            worldInfo += " UICam.viewport=(" + vp.x.ToString("F2") + "," + vp.y.ToString("F2") + "," + vp.z.ToString("F1") + ")"
+                                       + " inFrustum=" + (vp.x>=0 && vp.x<=1 && vp.y>=0 && vp.y<=1 && vp.z>0);
+                        }
+                    }
+                    // Parent Canvas info
+                    Canvas pCanvas = jb.GetComponentInParent<Canvas>();
+                    string canvasInfo = "";
+                    if (pCanvas != null)
+                    {
+                        canvasInfo = " canvas.mode=" + pCanvas.renderMode + " canvas.camera=" + (pCanvas.worldCamera != null ? pCanvas.worldCamera.name : "null") + " canvas.sortOrder=" + pCanvas.sortingOrder;
+                    }
+                    joyState = "Joystick_bak.active=" + jb.gameObject.activeSelf + posInfo + cgInfo + imgInfo + worldInfo + canvasInfo;
+                }
+                else            joyState = "Joystick_bak child not found";
+            }
+
+            UnityEngine.Debug.Log("[INPUT-LOG] frame=" + Time.frameCount
+                + " mouse.down=" + downNow + (downStart ? " (DOWN)" : "") + (downEnd ? " (UP)" : "")
+                + " mp=(" + mp.x.ToString("F0") + "," + mp.y.ToString("F0") + ")"
+                + " touchCount=" + touchCnt
+                + " PointIsOverUI=" + overUI
+                + " joy=" + joyState);
+
+            _inputLogCooldown = 0;
+            _wasDown = downNow;
+            _lastTouchCount = touchCnt;
+        }
     }
 
     static void DumpState()

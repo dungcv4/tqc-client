@@ -290,6 +290,22 @@ public class WndRoot : MonoBehaviour
         }
         if (s_camera.nearClipPlane > -1f) s_camera.nearClipPlane = -1f;
         if (s_camera.farClipPlane < 200f) s_camera.farClipPlane = 200f;
+
+        // EDITOR FIX: GameEntry.unity's GUI_Root RectTransform has LocalScale=(0,0,0) in the
+        // serialized scene (AssetRipper export artifact). For a ScreenSpaceCamera Canvas Unity
+        // would normally auto-fix the scale at runtime via CanvasScaler, but the (0,0,0)
+        // serialized value survives in some Editor situations → every UI child renders at
+        // scale 0 → invisible (canvasRenderer.cull=true, world positions degenerate).
+        // Force scale to (1,1,1) if zero so CanvasScaler can take over.
+        if (s_rootRectTrans != null)
+        {
+            Vector3 sc = s_rootRectTrans.localScale;
+            if (sc == Vector3.zero)
+            {
+                UnityEngine.Debug.LogWarning("[WndRoot.Start] GUI_Root LocalScale was (0,0,0) — forcing to (1,1,1)");
+                s_rootRectTrans.localScale = Vector3.one;
+            }
+        }
         return true;
     }
     public static void Lunch() { }
