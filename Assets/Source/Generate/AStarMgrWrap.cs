@@ -32,12 +32,16 @@ public class AStarMgrWrap
 	// wrap's get_Instance (BinFileMgrWrap.cs:50, ConfigMgrWrap.cs:60, ResMgrWrap.cs:50, …) which
 	// auto-gen emits when the type is registered with RegVar instead of RegFunction. Kept as a
 	// separate function so the AssetRipper-exported get_Instance above stays byte-identical.
+	//
+	// Note: AStarMgr only exposes the static method `get_Instance()` (Ghidra RVA 0x15AC57C),
+	// not a `Instance` property. Calling the method directly preserves the same semantics
+	// because tolua only needs the singleton instance to push.
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
 	static int _PropertyGet_Instance(IntPtr L)
 	{
 		try
 		{
-			ToLua.PushObject(L, AStarMgr.Instance);
+			ToLua.PushObject(L, AStarMgr.get_Instance());
 			return 1;
 		}
 		catch (Exception e)
