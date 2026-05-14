@@ -62,13 +62,20 @@ public class WndForm_LoadingScreen : WndForm
         get { return _showLoading; }
         set
         {
+            // DIAG: log every set so we can correlate with Lua-side SceneMgr / ProcessInMap traces.
+            UnityEngine.Debug.Log($"[DIAG WndForm_LoadingScreen.set_showLoading] value={value} s_instance.null={s_instance == null} IsShow={(s_instance != null ? s_instance.IsShow().ToString() : "<no-instance>")}");
             // Mirror the static flag for direct consumers (e.g. CheckShowFps).
             _showLoading = value;
             var self = s_instance;
             if (self == null) return;
-            if (self.IsShow() == value) return;
+            if (self.IsShow() == value)
+            {
+                UnityEngine.Debug.Log($"[DIAG WndForm_LoadingScreen.set_showLoading] idempotent skip (IsShow already == {value})");
+                return;
+            }
             if (!value)
             {
+                UnityEngine.Debug.Log("[DIAG WndForm_LoadingScreen.set_showLoading] → SetShow(false)");
                 self.SetShow(false);
                 return;
             }
