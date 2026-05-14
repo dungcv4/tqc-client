@@ -312,7 +312,17 @@ public class SpriteMesh_Managed : ISpriteMesh, IEZLinkedListItem<SpriteMesh_Mana
 	// 1-1: return hidden (byte at 0x18).
 	public virtual bool IsHidden() { return hidden; }
 
-	// Source: dump.cs ctor (no Ghidra body — default object ctor only, no field initializers).
-	// 1-1: base() — fields zero-init via CLR.
-	public SpriteMesh_Managed() { }
+	// Source: Ghidra _ctor.c RVA 0x01583454
+	// 1-1:
+	//   m_vertices = new Vector3[4];        // offset 0x40
+	//   m_uvs      = new Vector2[4];        // offset 0x48
+	//   m_uvs2     = new Vector2[4];        // offset 0x50
+	//   System.Object..ctor(this);
+	// (m_useUV2 stays false by default — no init in ctor.)
+	public SpriteMesh_Managed()
+	{
+		m_vertices = new Vector3[4];
+		m_uvs      = new Vector2[4];
+		m_uvs2     = new Vector2[4];
+	}
 }
