@@ -74,6 +74,12 @@ public static class LuaBinder
 		SoundProxyWrap.Register(L);
 		SpriteManagerPoolWrap.Register(L);
 		SpriteRootWrap.Register(L);
+		// HAND-PORTED from Ghidra work/06_ghidra/decompiled_full/PackedSpriteWrap/Register.c
+		// (Production has PackedSpriteWrap at TypeDefIndex 428 — auto-gen blocked by SpineSkin).
+		// Required for Lua to resolve .gameObject on PackedSprite return values (e.g. from
+		// SpriteManagerPool.getShadow → BaseEntity_PaperDoll.UpdateShadow).
+		SpriteBaseWrap.Register(L);
+		PackedSpriteWrap.Register(L);
 		TextureAnimWrap.Register(L);
 		TweenAlphaWrap.Register(L);
 		TweenPositionWrap.Register(L);
