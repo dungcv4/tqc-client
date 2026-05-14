@@ -86,17 +86,196 @@ public class SpriteManager : MonoBehaviour
         return PixelCoordToUVCoord(new Vector2((float)x, (float)y));
     }
 
-    // RVA: 0x1573B1C  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/SetupBoneWeights.c
-    protected void SetupBoneWeights(SpriteMesh_Managed s) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/SetupBoneWeights.c RVA 0x1573B1C
+    // 1-1: for each of the 4 vertex slots (mv1..mv4 — SpriteMesh_Managed offsets 0x90/94/98/9c),
+    //      writes boneWeights[mvN].boneIndex0 = s.index, .weight0 = 1.0f. Pins all 4 quad
+    //      vertices to the same bone — the bone driving sm's SpriteRoot transform.
+    protected void SetupBoneWeights(SpriteMesh_Managed s)
+    {
+        if (s == null) throw new System.NullReferenceException();
+        if (boneWeights == null) throw new System.NullReferenceException();
+        int idx = s.index;
+        int[] mv = new int[] { s.mv1, s.mv2, s.mv3, s.mv4 };
+        for (int k = 0; k < 4; k++)
+        {
+            int slot = mv[k];
+            if ((uint)slot >= (uint)boneWeights.Length) throw new System.IndexOutOfRangeException();
+            UnityEngine.BoneWeight bw = boneWeights[slot];
+            bw.boneIndex0 = idx;
+            bw.weight0    = 1f;
+            boneWeights[slot] = bw;
+        }
+    }
 
-    // RVA: 0x1573CA0  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/Awake.c
-    private void Awake() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/Awake.c RVA 0x1573CA0
+    // 1-1 mapping:
+    //   if (spriteAddQueue == null) spriteAddQueue = new List<SpriteRoot>();
+    //   meshRenderer = this.GetComponent<SkinnedMeshRenderer>();
+    //   if (meshRenderer != null) {
+    //       Material sm = meshRenderer.sharedMaterial;
+    //       if (sm != null) texture = sm.GetTexture("_MainTex");     // lit 13370
+    //   }
+    //   if (meshRenderer != null) {
+    //       if (meshRenderer.sharedMesh == null) meshRenderer.sharedMesh = new Mesh();
+    //       mesh = meshRenderer.sharedMesh;
+    //       if (mesh != null) {
+    //           mesh.MarkDynamic();
+    //           if (persistent) { DontDestroyOnLoad(this); DontDestroyOnLoad(mesh); }
+    //           EnlargeArrays(allocBlockSize);
+    //           this.transform.rotation = Quaternion.identity;        // PTR_DAT_03446b08 = Quaternion.identity static
+    //           initialized = true;
+    //           // Drain spriteAddQueue
+    //           for (int i = 0; i < spriteAddQueue.Count; i++) AddSprite(spriteAddQueue[i]);
+    //       }
+    //   }
+    private void Awake()
+    {
+        if (spriteAddQueue == null) spriteAddQueue = new System.Collections.Generic.List<SpriteRoot>();
+        meshRenderer = GetComponent<SkinnedMeshRenderer>();
+        if ((UnityEngine.Object)meshRenderer != null)
+        {
+            UnityEngine.Material sharedMat = meshRenderer.sharedMaterial;
+            if ((UnityEngine.Object)sharedMat != null)
+            {
+                texture = sharedMat.GetTexture("_MainTex");
+            }
+        }
+        if ((UnityEngine.Object)meshRenderer != null)
+        {
+            if ((UnityEngine.Object)meshRenderer.sharedMesh == null)
+            {
+                meshRenderer.sharedMesh = new UnityEngine.Mesh();
+            }
+            mesh = meshRenderer.sharedMesh;
+            if ((UnityEngine.Object)mesh != null)
+            {
+                mesh.MarkDynamic();
+                if (persistent)
+                {
+                    UnityEngine.Object.DontDestroyOnLoad(this);
+                    UnityEngine.Object.DontDestroyOnLoad(mesh);
+                }
+                EnlargeArrays(allocBlockSize);
+                base.transform.rotation = UnityEngine.Quaternion.identity;
+                initialized = true;
+                if (spriteAddQueue != null)
+                {
+                    for (int i = 0; i < spriteAddQueue.Count; i++)
+                    {
+                        AddSprite(spriteAddQueue[i]);
+                    }
+                }
+            }
+        }
+    }
 
-    // RVA: 0x1574C48  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/InitArrays.c
-    protected void InitArrays() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/InitArrays.c RVA 0x1574C48
+    // 1-1 mapping (initial 1-slot allocation; EnlargeArrays grows from here):
+    //   bones        = new Transform[1];
+    //   bones[0]     = this.transform;
+    //   bindPoses    = new Matrix4x4[1];
+    //   sprites      = new SpriteMesh_Managed[1];
+    //   sprites[0]   = new SpriteMesh_Managed();
+    //   vertices     = new Vector3[4];   // 4 verts per quad
+    //   UVs          = new Vector2[4];
+    //   UVs2         = new Vector2[4];
+    //   triIndices   = new int[6];       // 2 triangles × 3 indices  (Ghidra count=6 → 0xa8)
+    //   boneWeights  = new BoneWeight[4]; // 1 per vertex             (Ghidra count=4 → 0x90)
+    //   sprites[0].index = 0;
+    //   sprites[0].vertCount? / triCount? = some default vec from .rodata (skipped — fields
+    //   not yet identified in SpriteMesh_Managed dump, defaults to zero-init is fine).
+    //   SetupBoneWeights(sprites[0]);
+    protected void InitArrays()
+    {
+        bones = new UnityEngine.Transform[1];
+        bones[0] = base.transform;
+        bindPoses = new UnityEngine.Matrix4x4[1];
+        sprites = new SpriteMesh_Managed[1];
+        sprites[0] = new SpriteMesh_Managed();
+        vertices    = new UnityEngine.Vector3[4];
+        UVs         = new UnityEngine.Vector2[4];
+        UVs2        = new UnityEngine.Vector2[4];
+        triIndices  = new int[6];
+        boneWeights = new UnityEngine.BoneWeight[4];
+        sprites[0].index = 0;
+        SetupBoneWeights(sprites[0]);
+    }
 
-    // RVA: 0x1574078  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/EnlargeArrays.c
-    protected int EnlargeArrays(int count) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/EnlargeArrays.c RVA 0x1574078
+    // 1-1 condensed (the 356-line decompile expands every Array.Copy inline; logic mirrored
+    // here using System.Array.Resize for clarity but semantically identical):
+    //   if (sprites == null) InitArrays();
+    //   int oldSpriteCnt = sprites.Length;
+    //   int newSpriteCnt = oldSpriteCnt + count;
+    //   Array.Resize(ref sprites, newSpriteCnt);                  // SpriteMesh_Managed[]
+    //   Array.Resize(ref bones, newSpriteCnt);                    // Transform[]
+    //   Array.Resize(ref bindPoses, newSpriteCnt);                // Matrix4x4[]
+    //   Array.Resize(ref vertices,    newSpriteCnt * 4);          // 4 verts per quad
+    //   Array.Resize(ref UVs,         newSpriteCnt * 4);
+    //   Array.Resize(ref UVs2,        newSpriteCnt * 4);
+    //   Array.Resize(ref triIndices,  newSpriteCnt * 6);          // 6 indices per quad
+    //   Array.Resize(ref boneWeights, newSpriteCnt * 4);
+    //   for (int i = oldSpriteCnt; i < newSpriteCnt; i++) {
+    //       sprites[i] = new SpriteMesh_Managed();
+    //       sprites[i].index = i;
+    //       sprites[i].mv1 = i*4;   sprites[i].mv2 = i*4 + 1;
+    //       sprites[i].mv3 = i*4 + 2; sprites[i].mv4 = i*4 + 3;
+    //       sprites[i].uv1 = sprites[i].mv1; ... uv4 = mv4;
+    //       sprites[i].cv1 = sprites[i].mv1; ... cv4 = mv4;
+    //       // wire 2 triangles into triIndices
+    //       triIndices[i*6 + 0] = i*4 + 0;
+    //       triIndices[i*6 + 1] = i*4 + 1;
+    //       triIndices[i*6 + 2] = i*4 + 2;
+    //       triIndices[i*6 + 3] = i*4 + 2;
+    //       triIndices[i*6 + 4] = i*4 + 3;
+    //       triIndices[i*6 + 5] = i*4 + 0;
+    //       // add to availableBlocks pool
+    //       availableBlocks.Add(sprites[i]);
+    //       SetupBoneWeights(sprites[i]);
+    //   }
+    //   vertCountChanged = true;
+    //   return newSpriteCnt;
+    protected int EnlargeArrays(int count)
+    {
+        if (sprites == null) InitArrays();
+        int oldCnt = sprites.Length;
+        int newCnt = oldCnt + count;
+        System.Array.Resize(ref sprites, newCnt);
+        System.Array.Resize(ref bones, newCnt);
+        System.Array.Resize(ref bindPoses, newCnt);
+        System.Array.Resize(ref vertices,    newCnt * 4);
+        System.Array.Resize(ref UVs,         newCnt * 4);
+        System.Array.Resize(ref UVs2,        newCnt * 4);
+        System.Array.Resize(ref triIndices,  newCnt * 6);
+        System.Array.Resize(ref boneWeights, newCnt * 4);
+        for (int i = oldCnt; i < newCnt; i++)
+        {
+            sprites[i] = new SpriteMesh_Managed();
+            sprites[i].index = i;
+            sprites[i].mv1 = i * 4 + 0;
+            sprites[i].mv2 = i * 4 + 1;
+            sprites[i].mv3 = i * 4 + 2;
+            sprites[i].mv4 = i * 4 + 3;
+            sprites[i].uv1 = sprites[i].mv1;
+            sprites[i].uv2 = sprites[i].mv2;
+            sprites[i].uv3 = sprites[i].mv3;
+            sprites[i].uv4 = sprites[i].mv4;
+            sprites[i].cv1 = sprites[i].mv1;
+            sprites[i].cv2 = sprites[i].mv2;
+            sprites[i].cv3 = sprites[i].mv3;
+            sprites[i].cv4 = sprites[i].mv4;
+            triIndices[i * 6 + 0] = i * 4 + 0;
+            triIndices[i * 6 + 1] = i * 4 + 1;
+            triIndices[i * 6 + 2] = i * 4 + 2;
+            triIndices[i * 6 + 3] = i * 4 + 2;
+            triIndices[i * 6 + 4] = i * 4 + 3;
+            triIndices[i * 6 + 5] = i * 4 + 0;
+            if (availableBlocks != null) availableBlocks.Add(sprites[i]);
+            SetupBoneWeights(sprites[i]);
+        }
+        vertCountChanged = true;
+        return newCnt;
+    }
 
     // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/AlreadyAdded.c RVA 0x1574F00
     // 1-1:
