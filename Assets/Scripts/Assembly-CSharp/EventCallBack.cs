@@ -37,7 +37,7 @@ public class EventCallBack
 
     // Source: Ghidra OnEvent_bool.c RVA 0x18F5170
     // 1-1 mapping:
-    //   if (_parent == null) /* throw NullReferenceException via FUN_015cb8fc */ return;
+    //   if (_parent == null) throw NullReferenceException();    // Ghidra: FUN_015cb8fc at fall-through
     //   sWndFormID  = _parent + 0x70;                // _parent._sWndFormID
     //   sLuaMethod  = this + 0x18;                   // _sLuaMethod
     //   args        = new object[2];                 // FUN_015cb754(System.Object[]_type, 2)
@@ -49,7 +49,7 @@ public class EventCallBack
     //       parent.sWndFormID property returns _sWndFormID (private field at 0x70).
     public void OnEvent(bool bOn)
     {
-        if (_parent == null) return;
+        if (_parent == null) throw new System.NullReferenceException();
         object[] args = new object[2];
         args[0] = _parent.LuaClass;
         args[1] = bOn;
@@ -59,7 +59,7 @@ public class EventCallBack
     // Source: Ghidra OnEvent_int.c RVA 0x18F52AC — same shape, args[1] = box(iIdx).
     public void OnEvent(int iIdx)
     {
-        if (_parent == null) return;
+        if (_parent == null) throw new System.NullReferenceException();
         object[] args = new object[2];
         args[0] = _parent.LuaClass;
         args[1] = iIdx;
@@ -69,7 +69,7 @@ public class EventCallBack
     // Source: Ghidra OnEvent_string.c RVA 0x18F53E4 — args[1] = value (reference type, no boxing).
     public void OnEvent(string value)
     {
-        if (_parent == null) return;
+        if (_parent == null) throw new System.NullReferenceException();
         object[] args = new object[2];
         args[0] = _parent.LuaClass;
         args[1] = value;
@@ -79,7 +79,7 @@ public class EventCallBack
     // Source: Ghidra OnEvent_BaseEventData.c RVA 0x18F54E8 — args[1] = eventData (reference type).
     public void OnEvent(BaseEventData eventData)
     {
-        if (_parent == null) return;
+        if (_parent == null) throw new System.NullReferenceException();
         object[] args = new object[2];
         args[0] = _parent.LuaClass;
         args[1] = eventData;
@@ -89,7 +89,7 @@ public class EventCallBack
     // Source: Ghidra OnEvent_Vector2.c RVA 0x18F55EC — args[1] = box(pos), Vector2 struct.
     public void OnEvent(Vector2 pos)
     {
-        if (_parent == null) return;
+        if (_parent == null) throw new System.NullReferenceException();
         object[] args = new object[2];
         args[0] = _parent.LuaClass;
         args[1] = pos;
@@ -99,7 +99,7 @@ public class EventCallBack
     // Source: Ghidra OnEvent_float.c RVA 0x18F5730 — args[1] = box(value), float.
     public void OnEvent(float value)
     {
-        if (_parent == null) return;
+        if (_parent == null) throw new System.NullReferenceException();
         object[] args = new object[2];
         args[0] = _parent.LuaClass;
         args[1] = value;

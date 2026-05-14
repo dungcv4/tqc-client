@@ -53,26 +53,47 @@ public class SMapTextureMgr
     public SMapTextureMgr() { }
 
     // Source: Ghidra GetSMapSprite.c RVA 0x18CE6D8
-    // 1-1 mapping:
-    //   ResMgr rm = ResMgr.Instance;                        // PTR_DAT_034481e8 static area + 0xb8
-    //   if (rm == null || rm.SMapBundleOP == null)          // SMapBundleOP at offset 0x68
-    //       return null;
-    //   Type t = typeof(UnityEngine.Sprite);                // PTR_DAT_0345a358 → GetTypeFromHandle
-    //   UnityEngine.Object o = rm.SMapBundleOP.Load(smapName, t);  // AssetBundleOP.Load
-    //   if (o == null) return null;
-    //   if (o.GetType() != typeof(Sprite)) return null;     // PTR_DAT_03459188 = Sprite type ptr
-    //   return (Sprite)o;
-    // The final type check rejects non-Sprite returns (asset bundle may return Texture2D, etc.).
+    // 1-1 mapping (control flow exactly matches the .c):
+    //   ResMgr.cctor;                                       // class-init guard
+    //   if (ResMgr.Instance != null) {                      // **(lVar2 + 0xb8) != 0 outer if
+    //       if (ResMgr.Instance.SMapBundleOP == null)       // _instance + 0x68 (SMapBundleOP)
+    //           return null;
+    //       ResMgr.cctor;                                   // duplicated class-init (Cpp2IL leaves it twice)
+    //       if (ResMgr.Instance != null) {                  // inner re-check (Cpp2IL artifact)
+    //           AssetBundleOP smap = ResMgr.Instance.SMapBundleOP;
+    //           Type t = typeof(UnityEngine.Sprite);        // PTR_DAT_0345a358 → GetTypeFromHandle
+    //           if (smap != null) {
+    //               UnityEngine.Object o = smap.Load(smapName, t);
+    //               if (o == null) return null;
+    //               if (o.GetType() != typeof(Sprite)) return null;  // klass-ptr check
+    //               return (Sprite)o;
+    //           }
+    //       }
+    //   }
+    //   throw new NullReferenceException();                 // FUN_015cb8fc fall-through
     public Sprite GetSMapSprite(string smapName)
     {
         ResMgr rm = ResMgr.Instance;
-        if (rm == null) return null;
-        AssetBundleOP smapBundle = rm.SMapBundleOP;
-        if (smapBundle == null) return null;
-        UnityEngine.Object loaded = smapBundle.Load(smapName, typeof(UnityEngine.Sprite));
-        if (loaded == null) return null;
-        // Ghidra's `if (*plVar3 == *(long *)PTR_DAT_03459188)` is a runtime klass-pointer check; the
-        // C#-level equivalent is `loaded is Sprite` (returns false for any non-Sprite UnityEngine.Object).
-        return loaded as Sprite;
+        if (rm != null)
+        {
+            if (rm.SMapBundleOP == null) return null;
+            // Inner re-check mirrors Cpp2IL's duplicated null-check on the singleton; keeps the
+            // bracket-control-flow 1-1 with the .c. In managed land it's a no-op (rm can't change).
+            if (rm != null)
+            {
+                AssetBundleOP smapBundle = rm.SMapBundleOP;
+                if (smapBundle != null)
+                {
+                    UnityEngine.Object loaded = smapBundle.Load(smapName, typeof(UnityEngine.Sprite));
+                    if (loaded == null) return null;
+                    // Ghidra `if (*plVar3 == *(long *)PTR_DAT_03459188)` is the runtime klass-pointer
+                    // check; managed equivalent is `loaded is Sprite` (the as-cast result).
+                    Sprite sprite = loaded as Sprite;
+                    if (sprite == null) return null;
+                    return sprite;
+                }
+            }
+        }
+        throw new System.NullReferenceException();
     }
 }
