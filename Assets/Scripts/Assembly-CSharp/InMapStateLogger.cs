@@ -212,6 +212,45 @@ public static class InMapStateLogger
                         }
                     }
                     else sb.AppendLine("        _ser_stat_frame_info=<field missing>");
+
+                    // Also dump PackedSprite.staticFrameInfo (the SPRITE_FRAME struct copy from Awake).
+                    var staticField = psType.GetField("staticFrameInfo", BFR);
+                    if (staticField != null)
+                    {
+                        var staticVal = staticField.GetValue(c);
+                        if (staticVal == null) sb.AppendLine("        staticFrameInfo=NULL");
+                        else
+                        {
+                            var stType = staticVal.GetType();
+                            sb.Append("        staticFrameInfo: ");
+                            DumpField(sb, stType, staticVal, "uvs", BFR);
+                            DumpField(sb, stType, staticVal, "scaleFactor", BFR);
+                            DumpField(sb, stType, staticVal, "topLeftOffset", BFR);
+                            DumpField(sb, stType, staticVal, "bottomRightOffset", BFR);
+                            sb.AppendLine();
+                        }
+                    }
+                }
+
+                // DIAG: dump SpriteRoot.frameInfo (current frame state — should match staticFrameInfo
+                // initially, then gets updated by animation pump). If frameInfo.scaleFactor = (1,1)
+                // but staticFrameInfo.scaleFactor = (0.5,0.5), then frameInfo was never seeded from
+                // staticFrameInfo → that's the missing copy in Awake/Init.
+                var fiField = srType.GetField("frameInfo", BFR);
+                if (fiField != null)
+                {
+                    var fiVal = fiField.GetValue(c);
+                    if (fiVal == null) sb.AppendLine("        frameInfo=NULL");
+                    else
+                    {
+                        var fiType = fiVal.GetType();
+                        sb.Append("        frameInfo (SpriteRoot): ");
+                        DumpField(sb, fiType, fiVal, "uvs", BFR);
+                        DumpField(sb, fiType, fiVal, "scaleFactor", BFR);
+                        DumpField(sb, fiType, fiVal, "topLeftOffset", BFR);
+                        DumpField(sb, fiType, fiVal, "bottomRightOffset", BFR);
+                        sb.AppendLine();
+                    }
                 }
             }
 
