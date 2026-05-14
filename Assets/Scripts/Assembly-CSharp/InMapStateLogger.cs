@@ -157,6 +157,37 @@ public static class InMapStateLogger
             sb.AppendLine("  PLAYER-100001 hierarchy + components:");
             DumpGoTree(sb, playerGo.transform, "    ", 0, 5);
 
+            // 6d. DIAG: for each child PackedSprite, dump SpriteRoot field values:
+            //     width, height, anchor, offset, topLeft, bottomRight, uvRect, scaleFactor,
+            //     topLeftOffset, bottomRightOffset, plane.
+            sb.AppendLine("  PackedSprite SpriteRoot fields:");
+            var allPackedSprites = playerGo.GetComponentsInChildren<Component>(true);
+            var srType = System.Type.GetType("SpriteRoot, Assembly-CSharp-firstpass");
+            const System.Reflection.BindingFlags BFR = System.Reflection.BindingFlags.Public
+                | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+            foreach (var c in allPackedSprites)
+            {
+                if (c == null) continue;
+                if (srType == null || !srType.IsInstanceOfType(c)) continue;
+                sb.Append("    [").Append(c.name).Append("] ");
+                DumpField(sb, srType, c, "width", BFR);
+                DumpField(sb, srType, c, "height", BFR);
+                DumpField(sb, srType, c, "anchor", BFR);
+                DumpField(sb, srType, c, "plane", BFR);
+                DumpField(sb, srType, c, "offset", BFR);
+                sb.AppendLine();
+                sb.Append("        ");
+                DumpField(sb, srType, c, "topLeft", BFR);
+                DumpField(sb, srType, c, "bottomRight", BFR);
+                DumpField(sb, srType, c, "uvRect", BFR);
+                sb.AppendLine();
+                sb.Append("        ");
+                DumpField(sb, srType, c, "scaleFactor", BFR);
+                DumpField(sb, srType, c, "topLeftOffset", BFR);
+                DumpField(sb, srType, c, "bottomRightOffset", BFR);
+                sb.AppendLine();
+            }
+
             // 6c. DIAG: SM2 architecture — PackedSprite has no own renderer; rendering is on the
             //     SpriteManager that owns its slot. Find ALL SpriteManager objects in scene and log
             //     their mesh state + sprite-slot count + sample player part manager refs.
@@ -377,6 +408,36 @@ public static class InMapStateLogger
         sb.AppendLine();
         for (int i = 0; i < t.childCount && i < 30; i++)
             DumpTree(sb, t.GetChild(i), depth + 1, maxDepth);
+    }
+
+    // Helper: reflection-read a field/property by name + append "key=value " to sb.
+    static void DumpField(StringBuilder sb, System.Type t, object obj, string name, System.Reflection.BindingFlags bf)
+    {
+        var f = t.GetField(name, bf);
+        if (f != null)
+        {
+            var v = f.GetValue(obj);
+            sb.Append(name).Append("=");
+            if (v is Vector3 v3) sb.Append(v3.ToString("F1"));
+            else if (v is Vector2 v2) sb.Append(v2.ToString("F2"));
+            else if (v is Rect r) sb.Append("(x:").Append(r.x.ToString("F2")).Append(" y:").Append(r.y.ToString("F2"))
+                                   .Append(" w:").Append(r.width.ToString("F2")).Append(" h:").Append(r.height.ToString("F2")).Append(")");
+            else sb.Append(v == null ? "null" : v.ToString());
+            sb.Append(" ");
+            return;
+        }
+        var p = t.GetProperty(name, bf);
+        if (p != null)
+        {
+            try
+            {
+                var v = p.GetValue(obj);
+                sb.Append(name).Append("=").Append(v == null ? "null" : v.ToString()).Append(" ");
+            }
+            catch { sb.Append(name).Append("=<getter-throw> "); }
+            return;
+        }
+        sb.Append(name).Append("=<missing> ");
     }
 
     // Helper: build a "/Root/A/B/C" path string for a transform (limit to 6 parents).
