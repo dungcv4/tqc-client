@@ -869,7 +869,18 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 			width  = uvRect.width  * worldUnitsPerScreenPixel * pixelsPerUV.x;
 			height = uvRect.height * worldUnitsPerScreenPixel * pixelsPerUV.y;
 		}
-		CalcEdges();
+		// Ghidra CalcSize.c line 34-36 (RVA 0x01581284):
+		//   (**(code **)(*param_1 + 0x298))(*(undefined4 *)((long)param_1 + 0x44), (int)param_1[9], param_1, ...)
+		// vtable+0x298 = SetSize (Slot 22 — verified: vtable_base 0x138 + 22*16 = 0x298)
+		// Previous port called CalcEdges() directly, which updates SpriteRoot.topLeft/bottomRight
+		// but does NOT propagate to mesh vertices. SetSize calls SetSizeXY which calls CalcEdges
+		// AND writes m_vertices (including UpdateVerts → meshVerts).
+		// Symptom: scaleFactor/topLeftOffset updated on SpriteRoot after PlayAnim, topLeft/bottomRight
+		// also updated, BUT mesh.vertices stayed at the SetSizeXY-written values from when scaleFactor
+		// was still the ctor default (0.5, 0.5). Result: horse appears symmetric not asymmetric;
+		// rider's body1001 sits at horse's center instead of above (where its frame's asymmetric
+		// topLeft/bottomRight would place it).
+		SetSize(width, height);
 	}
 
 	// Source: Ghidra SetSize.c RVA 0x015846C4
