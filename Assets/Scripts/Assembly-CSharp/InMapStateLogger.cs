@@ -160,9 +160,12 @@ public static class InMapStateLogger
             // 6d. DIAG: for each child PackedSprite, dump SpriteRoot field values:
             //     width, height, anchor, offset, topLeft, bottomRight, uvRect, scaleFactor,
             //     topLeftOffset, bottomRightOffset, plane.
+            //     PLUS: PackedSprite._ser_stat_frame_info (the serialized prefab CSpriteFrame).
             sb.AppendLine("  PackedSprite SpriteRoot fields:");
             var allPackedSprites = playerGo.GetComponentsInChildren<Component>(true);
             var srType = System.Type.GetType("SpriteRoot, Assembly-CSharp-firstpass");
+            var psType = System.Type.GetType("PackedSprite, Assembly-CSharp-firstpass");
+            var csFrameType = System.Type.GetType("CSpriteFrame, Assembly-CSharp-firstpass");
             const System.Reflection.BindingFlags BFR = System.Reflection.BindingFlags.Public
                 | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
             foreach (var c in allPackedSprites)
@@ -186,6 +189,30 @@ public static class InMapStateLogger
                 DumpField(sb, srType, c, "topLeftOffset", BFR);
                 DumpField(sb, srType, c, "bottomRightOffset", BFR);
                 sb.AppendLine();
+
+                // DIAG: dump PackedSprite._ser_stat_frame_info (the serialized CSpriteFrame from prefab).
+                if (psType != null && psType.IsInstanceOfType(c))
+                {
+                    var serField = psType.GetField("_ser_stat_frame_info", BFR);
+                    if (serField != null)
+                    {
+                        var serVal = serField.GetValue(c);
+                        if (serVal == null)
+                        {
+                            sb.AppendLine("        _ser_stat_frame_info=NULL");
+                        }
+                        else if (csFrameType != null)
+                        {
+                            sb.Append("        _ser_stat_frame_info: ");
+                            DumpField(sb, csFrameType, serVal, "uvs", BFR);
+                            DumpField(sb, csFrameType, serVal, "scaleFactor", BFR);
+                            DumpField(sb, csFrameType, serVal, "topLeftOffset", BFR);
+                            DumpField(sb, csFrameType, serVal, "bottomRightOffset", BFR);
+                            sb.AppendLine();
+                        }
+                    }
+                    else sb.AppendLine("        _ser_stat_frame_info=<field missing>");
+                }
             }
 
             // 6c. DIAG: SM2 architecture — PackedSprite has no own renderer; rendering is on the
