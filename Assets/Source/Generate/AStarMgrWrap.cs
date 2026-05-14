@@ -16,12 +16,34 @@ public class AStarMgrWrap
 		L.RegFunction("SimulateCaculate", SimulateCaculate);
 		L.RegFunction("__eq", op_Equality);
 		L.RegFunction("__tostring", ToLua.op_ToString);
-		// Lua reads `AStarMgr.Instance:SpawnNodes()` (MapInfoMgr.lua:2314) etc. — needs property
-		// accessor. Auto-gen omitted this when first generated; restored 1-1 with other singleton
-		// wraps (BinFileMgrWrap, ConfigMgrWrap, ResMgrWrap, …) which all expose Instance via RegVar.
-		L.RegVar("Instance",   get_Instance,   null);
-		L.RegVar("TotalNodes", get_TotalNodes, null);
+		// HAND-ADDED: production binary (dump.cs TypeDefIndex 319) registers AStarMgrWrap with the
+		// same surface as BinFileMgrWrap / ConfigMgrWrap / ResMgrWrap / … — `Instance` is exposed
+		// as a Lua property. This AssetRipper-regenerated wrap only emitted the RegFunction
+		// `get_Instance` (function-call style); restoring the RegVar binding so
+		// `AStarMgr.Instance:SpawnNodes()` (MapInfoMgr.lua:2314) resolves. Uses a SEPARATE
+		// property-style getter `_PropertyGet_Instance` to avoid touching the auto-gen body of
+		// `get_Instance` (which uses CheckArgsCount(L, 0) — incompatible with tolua's RegVar
+		// invocation, which passes the class table as arg 1).
+		L.RegVar("Instance", _PropertyGet_Instance, null);
 		L.EndClass();
+	}
+
+	// HAND-ADDED helper for RegVar("Instance", …). Matches the body of every working singleton
+	// wrap's get_Instance (BinFileMgrWrap.cs:50, ConfigMgrWrap.cs:60, ResMgrWrap.cs:50, …) which
+	// auto-gen emits when the type is registered with RegVar instead of RegFunction. Kept as a
+	// separate function so the AssetRipper-exported get_Instance above stays byte-identical.
+	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
+	static int _PropertyGet_Instance(IntPtr L)
+	{
+		try
+		{
+			ToLua.PushObject(L, AStarMgr.Instance);
+			return 1;
+		}
+		catch (Exception e)
+		{
+			return LuaDLL.toluaL_exception(L, e);
+		}
 	}
 
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
@@ -44,16 +66,11 @@ public class AStarMgrWrap
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
 	static int get_Instance(IntPtr L)
 	{
-		// HAND-FIX: must work for BOTH call styles:
-		//   1. RegFunction("get_Instance", ...) — Lua: `AStarMgr.get_Instance()` (0 args)
-		//   2. RegVar("Instance", get_Instance, null) — Lua: `AStarMgr.Instance` (tolua's
-		//      __index invokes the getter with 1 arg, the class table as "self").
-		// Auto-gen originally emitted ToLua.CheckArgsCount(L, 0) which is strict-zero and
-		// rejects path #2 with "no overload for method takes '1' arguments". Matched pattern
-		// of BinFileMgrWrap / ConfigMgrWrap / ResMgrWrap / … (no arg-count check, just push).
 		try
 		{
-			ToLua.PushObject(L, AStarMgr.Instance);
+			ToLua.CheckArgsCount(L, 0);
+			AStarMgr o = AStarMgr.get_Instance();
+			ToLua.Push(L, o);
 			return 1;
 		}
 		catch (Exception e)
