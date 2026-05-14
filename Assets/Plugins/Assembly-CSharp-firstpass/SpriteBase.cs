@@ -15,23 +15,24 @@ public abstract class SpriteBase : SpriteRoot, ISpriteAnimatable
 
 	public int defaultAnim;
 
-	protected int curAnimIndex;
+	// HAND-FIX: promote to internal so AutoSpriteBase (assembly-mate) can write fields per IL2CPP semantics.
+	internal int curAnimIndex;
 
-	protected AnimCompleteDelegate animCompleteDelegate;
+	internal AnimCompleteDelegate animCompleteDelegate;
 
-	protected AnimFrameDelegate animFrameDelegate;
+	internal AnimFrameDelegate animFrameDelegate;
 
-	protected float timeSinceLastFrame;
+	internal float timeSinceLastFrame;
 
-	protected float timeBetweenAnimFrames;
+	internal float timeBetweenAnimFrames;
 
-	protected float framesToAdvance;
+	internal float framesToAdvance;
 
-	protected bool animating;
+	internal bool animating;
 
-	protected bool currentlyAnimating;
+	internal bool currentlyAnimating;
 
-	protected SPRITE_FRAME nextFrameInfo;
+	internal SPRITE_FRAME nextFrameInfo;
 
 	public bool Animating
 	{

@@ -15,17 +15,20 @@ public class UVAnimation
 		Destroy = 5
 	}
 
-	protected SPRITE_FRAME[] frames;
+	// HAND-FIX visibility: dump.cs declares these as protected, but the IL2CPP binary writes them
+	// directly from AutoSpriteBase (assembly-mate, not subclass). Promoted to internal so port can
+	// preserve raw-offset writes — equivalent runtime behaviour.
+	internal SPRITE_FRAME[] frames;
 
-	protected int curFrame;
+	internal int curFrame;
 
-	protected int stepDir;
+	internal int stepDir;
 
-	protected int numLoops;
+	internal int numLoops;
 
-	protected bool playInReverse;
+	internal bool playInReverse;
 
-	protected float length;
+	internal float length;
 
 	public string name;
 

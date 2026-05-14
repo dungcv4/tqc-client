@@ -80,13 +80,46 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 	// Source: Ghidra ISpritePackable_get_gameObject.c RVA 0x0157C14C — return this.gameObject.
 	GameObject ISpritePackable.gameObject { get { return gameObject; } }
 
-	// Source: Ghidra GetDefaultPixelSize.c RVA 0x0157969C (145 lines)
-	// Pulls texture from DefaultState.spriteFrames[0] or DefaultFrame, loads via guid2Path + loader
-	// delegates, returns 1/(2*defaultFrame.width) * texture.width as the inverse-uv pixel scale.
-	// TODO RVA 0x0157969C — full port pending delegate Invoke vtable + DefaultFrame ergonomic.
+	// Source: Ghidra GetDefaultPixelSize.c RVA 0x0157969C
+	// 1-1:
+	//   TextureAnim defState = DefaultState (virtual vtable+0x638);
+	//   CSpriteFrame defFrame = DefaultFrame (virtual vtable+0x628);
+	//   if (defState == null || defState.frameGUIDs == null) return Vector2.zero;
+	//   if (defFrame == null || defFrame.uvs.width-or-height==0) Debug.LogWarning + return zero;
+	//   if (guid2Path == null) NRE;
+	//   string path = guid2Path(defState.frameGUIDs[0]);
+	//   Texture2D tex = loader(path, typeof(Texture2D)) as Texture2D;
+	//   if (tex != null) return (1/(2*defFrame.uvs.width)) * Vector2(tex.width, tex.height);
+	//   // tex == null fallback: pull from spriteMesh.material.GetTexture("_MainTex").
+	//   return defFrame.uvs.height * Vector2(mtex.width, ...).
 	public override Vector2 GetDefaultPixelSize(PathFromGUIDDelegate guid2Path, AssetLoaderDelegate loader)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		TextureAnim defState = DefaultState;
+		CSpriteFrame defFrame = DefaultFrame;
+		if (defState == null || defState.frameGUIDs == null) return Vector2.zero;
+		if (defFrame == null || (defFrame.uvs.width == 0f && defFrame.uvs.height == 0f))
+		{
+			Debug.LogWarning("Sprite " + name + " has no default frame info.");
+			return Vector2.zero;
+		}
+		if (guid2Path == null) throw new System.NullReferenceException();
+		string path = guid2Path(defState.frameGUIDs[0]);
+		if (loader == null) throw new System.NullReferenceException();
+		Texture2D tex = loader(path, typeof(Texture2D)) as Texture2D;
+		if ((UnityEngine.Object)tex != null)
+		{
+			float halfW = defFrame.uvs.width;
+			float inv = (halfW == 0f) ? 0f : 1f / (halfW + halfW);
+			return new Vector2(inv * tex.width, inv * tex.height);
+		}
+		// Fallback: managed spriteMesh.material.mainTexture
+		if (m_spriteMesh == null) return Vector2.zero;
+		Material mat = m_spriteMesh.material;
+		if ((UnityEngine.Object)mat == null) return Vector2.zero;
+		Texture mtex = mat.GetTexture("_MainTex");
+		if ((UnityEngine.Object)mtex == null) return Vector2.zero;
+		float scale = defFrame.uvs.height;
+		return new Vector2(scale * mtex.width, scale * mtex.height);
 	}
 
 	// Source: Ghidra SetPauseFrame.c RVA 0x01579AA4 — pauseFrame = frame.
@@ -153,34 +186,276 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		Init();
 	}
 
-	// Source: Ghidra Copy.c RVA 0x015726A0 (122 lines)
-	// SpriteBase.Copy(s); then complex UVAnimation array clone/copy logic. If !s.managed, fresh
-	// UVAnimation per States[i]. Else clone s.animations directly.
-	// TODO RVA 0x015726A0 — defer UVAnimation Clone + SetAnim chain pending UVAnimation port.
+	// Source: Ghidra Copy.c RVA 0x015726A0
+	// 1-1:
+	//   SpriteBase.Copy(s);
+	//   if (s == null || s is not AutoSpriteBase asb) return;
+	//   if (asb.managed) {
+	//       // Reference-share path: clone asb's animations array
+	//       if (asb.animations == null || asb.animations.Length == 0) return;
+	//       animations = new UVAnimation[asb.animations.Length];
+	//       for (int i = 0; i < asb.animations.Length; i++) {
+	//           if (asb.animations[i] == null) break;
+	//           animations[i] = asb.animations[i].Clone();
+	//       }
+	//       NRE;   // (Ghidra fall-through tail at LAB_01672964)
+	//   } else {
+	//       // Non-managed: build fresh UVAnimation per State
+	//       if (States == null) return;
+	//       if (asb.States == null) return;
+	//       animations = new UVAnimation[asb.States.Length];
+	//       for (int i = 0; i < asb.States.Length; i++) {
+	//           UVAnimation a = new UVAnimation();
+	//           animations[i] = a;
+	//           a.SetAnim(asb.States[i], i);
+	//       }
+	//   }
 	public override void Copy(SpriteRoot s)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		base.Copy(s);
+		if (s == null) return;
+		AutoSpriteBase asb = s as AutoSpriteBase;
+		if (asb == null) return;
+		if (!asb.managed)
+		{
+			TextureAnim[] srcStates = asb.States;
+			if (States == null) return;
+			if (srcStates == null) return;
+			animations = new UVAnimation[srcStates.Length];
+			for (int i = 0; i < srcStates.Length; i++)
+			{
+				UVAnimation a = new UVAnimation();
+				animations[i] = a;
+				if (srcStates[i] == null) break;
+				a.SetAnim(srcStates[i], i);
+			}
+		}
+		else
+		{
+			if (asb.animations == null) return;
+			if (asb.animations.Length == 0) return;
+			animations = new UVAnimation[asb.animations.Length];
+			for (int i = 0; i < asb.animations.Length; i++)
+			{
+				if (asb.animations[i] == null) break;
+				animations[i] = asb.animations[i].Clone();
+			}
+		}
 	}
 
-	// Source: Ghidra CopyAll.c RVA 0x01579FC4 (132 lines)
-	// SpriteBase.Copy(s); then allocate spriteFrames clone, allocate animations clone via TextureAnim
-	// Allocate per state, then UVAnimation SetAnim chain, then copy doNotTrimImages flag.
-	// TODO RVA 0x01579FC4 — defer pending TextureAnim+UVAnimation port.
+	// Source: Ghidra CopyAll.c RVA 0x01579FC4
+	// 1-1:
+	//   SpriteBase.Copy(s);
+	//   if (s == null || s is not AutoSpriteBase asb) return;
+	//   if (asb.States == null) return;
+	//   States = new TextureAnim[asb.States.Length];   // virtual set_States vtable+0x618
+	//   for (int i = 0; i < asb.States.Length; i++) {
+	//       TextureAnim t = new TextureAnim();
+	//       t.framerate = 15f;     // const 0x41700000
+	//       t.Allocate();
+	//       States[i] = t;
+	//   }
+	//   if (animations == null) {
+	//       animations = new UVAnimation[States.Length];
+	//   }
+	//   for (int i = 0; i < animations.Length; i++) {
+	//       if (States[i] == null) break;
+	//       TextureAnim.Copy(States[i], asb.States[i]);
+	//       UVAnimation a = new UVAnimation();
+	//       animations[i] = a;
+	//       a.SetAnim(States[i], i);
+	//   }
+	//   doNotTrimImages = asb.doNotTrimImages;
 	public virtual void CopyAll(SpriteRoot s)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		base.Copy(s);
+		if (s == null) return;
+		AutoSpriteBase asb = s as AutoSpriteBase;
+		if (asb == null) return;
+		TextureAnim[] srcStates = asb.States;
+		if (srcStates == null) return;
+		TextureAnim[] newStates = new TextureAnim[srcStates.Length];
+		for (int i = 0; i < srcStates.Length; i++)
+		{
+			TextureAnim t = new TextureAnim();
+			t.framerate = 15f;
+			t.Allocate();
+			newStates[i] = t;
+		}
+		States = newStates;
+		if (animations == null)
+		{
+			animations = new UVAnimation[newStates.Length];
+		}
+		for (int i = 0; i < animations.Length; i++)
+		{
+			if (newStates[i] == null) break;
+			newStates[i].Copy(srcStates[i]);
+			UVAnimation a = new UVAnimation();
+			animations[i] = a;
+			a.SetAnim(newStates[i], i);
+		}
+		doNotTrimImages = asb.doNotTrimImages;
 	}
 
-	// Source: Ghidra StepAnim.c RVA 0x0157A330 (228 lines)
-	// Complex per-frame animation tick: advances timeSinceLastFrame, calls UVAnimation.GetNextFrame,
-	// applies bleed compensation, handles loop/once/forwards/reverse, dispatches AnimCompleteDelegate
-	// when end-of-animation reached, branches on UVAnimation.onAnimEnd enum (5 cases: do-nothing,
-	// revert-to-static, complete-callback, hide, deactivate, destroy).
-	// TODO RVA 0x0157A330 — multi-state branch port pending UVAnimation.GetNextFrame + UVAnimation
-	// fields (loop direction, onAnimEnd enum).
+	// Source: Ghidra StepAnim.c RVA 0x0157A330
+	// 1-1 per-frame animation tick:
+	//   if (curAnim == null) return false;
+	//   timeSinceLastFrame += time;
+	//   framesToAdvance = timeSinceLastFrame / timeBetweenAnimFrames;
+	//   if (framesToAdvance < 1) {
+	//       if (crossfadeFrames) SetColor(white-with-alpha=1-fraction);   // virtual vtable+0x318
+	//       return true;
+	//   }
+	//   while (curAnim.GetNextFrame(ref nextFrameInfo)) {
+	//       framesToAdvance -= 1; timeSinceLastFrame -= timeBetweenAnimFrames;
+	//       if (framesToAdvance < 1) {
+	//           if (crossfadeFrames) { ... } else apply nextFrameInfo to spriteMesh.vertices.
+	//           ... bleed compensation + CalcSize OR vtable+0x298 (CalcEdges-equivalent) ...
+	//           if (pauseFrame != -1 && curAnim.curFrame == pauseFrame) { PauseAnim(); pauseFrame=-1; }
+	//           return true;
+	//       }
+	//   }
+	//   // Animation ended.
+	//   if (pauseFrame == -1) {
+	//       if (crossfadeFrames) SetColor(white);
+	//       switch (curAnim.onAnimEnd) {
+	//           case Do_Nothing:        PauseAnim + uvRect = frameInfo.uvs + SetBleedCompensation + maybe CalcSize.
+	//           case Revert_To_Static:  RevertToStatic.
+	//           case Play_Default_Anim: invoke animCompleteDelegate; PlayAnim(defaultAnim). return false.
+	//           case Hide:              vtable+0x378 (Hide(true)).
+	//           case Deactivate:        gameObject.SetActive(false).
+	//           case Destroy:           invoke delegate; vtable+0x258 (Delete); Object.Destroy(gameObject).
+	//       }
+	//       if (animFrameDelegate != null && onAnimEnd != Destroy) animFrameDelegate.Invoke(this, ...);
+	//       if (!currentlyAnimating) { curAnim = null; }
+	//   } else if (curAnim.curFrame == pauseFrame) {
+	//       PauseAnim(); pauseFrame = -1;
+	//   }
+	//   return false;
 	public override bool StepAnim(float time)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (curAnim == null) return false;
+		timeSinceLastFrame += time;
+		framesToAdvance = timeSinceLastFrame / timeBetweenAnimFrames;
+		if (framesToAdvance < 1f)
+		{
+			if (crossfadeFrames)
+			{
+				SetColor(new Color(1f, 1f, 1f, 1f - framesToAdvance));
+			}
+			return true;
+		}
+		while (curAnim.GetNextFrame(ref nextFrameInfo))
+		{
+			framesToAdvance      -= 1f;
+			timeSinceLastFrame   -= timeBetweenAnimFrames;
+			if (framesToAdvance < 1f)
+			{
+				if (crossfadeFrames)
+				{
+					// Apply nextFrameInfo to spriteMesh quad via vertex array (vtable+4 = get_vertices).
+					if (m_spriteMesh != null)
+					{
+						Vector3[] verts = m_spriteMesh.vertices;
+						if (verts != null && verts.Length >= 4)
+						{
+							float xMin = nextFrameInfo.topLeftOffset.x;
+							float xMax = nextFrameInfo.bottomRightOffset.x;
+							float yMin = nextFrameInfo.bottomRightOffset.y;
+							float yMax = nextFrameInfo.topLeftOffset.y;
+							verts[0] = new Vector3(xMin, yMax, 0f);
+							verts[1] = new Vector3(xMin, yMin, 0f);
+							verts[2] = new Vector3(xMax, yMin, 0f);
+							verts[3] = new Vector3(xMax, yMax, 0f);
+							if (curAnim != null && curAnim.frames != null)
+							{
+								int prevFrame = curAnim.curFrame;
+								int prevDir   = curAnim.stepDir;
+								int len = curAnim.frames.Length;
+								int target = prevFrame; if (len + 1 < prevFrame) target = len + 1; if (prevFrame < -1) target = -1;
+								curAnim.curFrame = target;
+								if (prevDir < 0)
+								{
+									curAnim.stepDir = -1;
+									curAnim.playInReverse = true;
+								}
+								else
+								{
+									curAnim.stepDir = 1;
+								}
+								SetColor(new Color(1f, 1f, 1f, 1f - framesToAdvance));
+							}
+						}
+					}
+				}
+				uvRect = frameInfo.uvs;
+				SetBleedCompensation(bleedCompensation);
+				if (autoResize || pixelPerfect) CalcSize();
+				else if ((int)anchor == 9) CalcSize();   // TEXTURE_OFFSET — recompute extents
+				if (pauseFrame != -1 && curAnim != null && curAnim.curFrame == pauseFrame)
+				{
+					PauseAnim();
+					pauseFrame = -1;
+				}
+				return true;
+			}
+			if (curAnim == null) break;
+		}
+		// Animation ended OR pauseFrame reached.
+		if (pauseFrame == -1)
+		{
+			if (crossfadeFrames) SetColor(new Color(1f, 1f, 1f, 1f));
+			if (curAnim != null)
+			{
+				switch ((int)curAnim.onAnimEnd)
+				{
+					case 0:   // Do_Nothing
+						PauseAnim();
+						uvRect = frameInfo.uvs;
+						SetBleedCompensation(bleedCompensation);
+						if (autoResize || pixelPerfect) CalcSize();
+						break;
+					case 1:   // Revert_To_Static
+						RevertToStatic();
+						break;
+					case 2:   // Play_Default_Anim
+						if (animCompleteDelegate != null) animCompleteDelegate.Invoke(this);
+						PlayAnim(defaultAnim);
+						return false;
+					case 3:   // Hide
+						Hide(true);
+						break;
+					case 4:   // Deactivate
+						{
+							GameObject go = gameObject;
+							if (go == null) break;
+							go.SetActive(false);
+						}
+						break;
+					case 5:   // Destroy
+						if (animCompleteDelegate != null) animCompleteDelegate.Invoke(this);
+						Delete();
+						UnityEngine.Object.Destroy(gameObject);
+						break;
+				}
+				if (animCompleteDelegate != null && curAnim != null && (int)curAnim.onAnimEnd != 5)
+				{
+					animCompleteDelegate.Invoke(this);
+				}
+				if (!currentlyAnimating)
+				{
+					curAnim = null;
+				}
+			}
+			return false;
+		}
+		if (curAnim != null && curAnim.curFrame == pauseFrame)
+		{
+			PauseAnim();
+			pauseFrame = -1;
+		}
+		return false;
 	}
 
 	// Source: Ghidra CallAnimCompleteDelegate.c RVA 0x0157A918
@@ -191,14 +466,78 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		animCompleteDelegate.Invoke(this);
 	}
 
-	// Source: Ghidra PlayAnim.c RVA 0x01578200 (~100 lines)
-	// 1-1: if (deleted) return; if (!gameObject.activeInHierarchy) return; if (anim == null) NRE;
-	//      curAnim = anim; if (!m_started) Awake(); ...timing setup + framerate compute + invoke
-	//      animFrameDelegate. If anim.framerate is 0 → PauseAnim, else schedule Invoke "StepAnim".
-	// TODO RVA 0x01578200 — port pending UVAnimation field map (frames, framerate, loopMode).
+	// Source: Ghidra PlayAnim.c RVA 0x01578200
+	// 1-1:
+	//   if (deleted) return;
+	//   if (!gameObject.activeInHierarchy) return;
+	//   if (anim == null || anim.frames == null || anim.frames.Length == 0) return;
+	//   if (!m_started) Awake();          // virtual vtable+0x208
+	//   curAnim = anim;
+	//   curAnim.numLoops = 0; curAnim.playInReverse = false; curAnim.frames = anim.frames;   (param_1[0x41] = anim.index)
+	//   curAnimIndex = anim.index;
+	//   if (anim.frames != null) {
+	//       int len = anim.frames.Length;
+	//       int targetFrame = clamp(frame-1, -1, len+1);
+	//       curAnim.curFrame = targetFrame;
+	//       pauseFrame = -1;
+	//       float fr = anim.framerate;
+	//       float invFr = (fr != 0) ? 1/fr : 1f;
+	//       timeBetweenAnimFrames = invFr;
+	//       framesToAdvance = invFr;
+	//       if (anim.frames.Length < 2 || fr == 0) {
+	//           // single-frame / zero-framerate path → PauseAnim + invoke complete + step
+	//           if (animFrameDelegate != null) {
+	//               if (fr == 0) animFrameDelegate.Invoke(this, targetFrame);
+	//               else Invoke("StepAnim", 1/fr);
+	//           }
+	//           PauseAnim();
+	//           StepAnim(0);
+	//       } else {
+	//           StepAnim(0);
+	//           if (!currentlyAnimating) AddToAnimatedList();   // virtual vtable+0x4F8
+	//       }
+	//   }
 	public void PlayAnim(UVAnimation anim, int frame)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (deleted) return;
+		if (!gameObject.activeInHierarchy) return;
+		if (anim == null || anim.frames == null || anim.frames.Length == 0) return;
+		if (!m_started) SendMessage("Awake", SendMessageOptions.DontRequireReceiver);
+		curAnim = anim;
+		curAnimIndex = anim.index;
+		anim.frames = anim.frames;        // keep — Ghidra sets curAnim.frames = anim.frames (alias)
+		anim.numLoops = 0;
+		anim.playInReverse = false;
+		int len = anim.frames.Length;
+		int target = frame - 1;
+		if (len + 1 < target) target = len + 1;
+		if (target < -1)      target = -1;
+		anim.curFrame = target;
+		pauseFrame = -1;
+		float fr = anim.framerate;
+		float invFr = (fr != 0f) ? 1f / fr : 1f;
+		timeBetweenAnimFrames = invFr;
+		framesToAdvance       = invFr;
+		if (anim.frames.Length < 2 || fr == 0f)
+		{
+			PauseAnim();
+			if (animFrameDelegate != null)
+			{
+				if (fr == 0f)
+				{
+					animFrameDelegate.Invoke(this, target);
+				}
+				else
+				{
+					Invoke("StepAnim", 1f / fr);
+				}
+			}
+			StepAnim(0f);
+			return;
+		}
+		StepAnim(0f);
+		if (currentlyAnimating) return;
+		AddToAnimatedList();
 	}
 
 	// Source: Ghidra PlayAnim_1.c RVA 0x01572970 — PlayAnim(anim, 0).
@@ -250,19 +589,124 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 	public override void PlayAnim(string name) { PlayAnim(name, 0); }
 
 	// Source: Ghidra PlayAnimInReverse.c RVA 0x01577874
-	// 1-1: similar to PlayAnim but sets curAnim.direction = REVERSE (offset 0x24 = 1) and starts
-	// from end-frame. Pending UVAnimation field map.
-	// TODO RVA 0x01577874 — port pending UVAnimation reverse-direction support.
+	// 1-1:
+	//   if (deleted) return;
+	//   if (!gameObject.activeInHierarchy) return;
+	//   curAnim = anim; curAnim.numLoops = 0; curAnim.playInReverse = false (initial); curAnim.frames = -1;
+	//   if (anim.frames != null) {
+	//       curAnim.numLoops = 0;
+	//       curAnim.playInReverse = true;
+	//       curAnim.curFrame = anim.frames.Length;
+	//       if (anim != null) {
+	//           float fr = anim.framerate;
+	//           float invFr = (fr != 0) ? 1/fr : 1f;
+	//           timeBetweenAnimFrames = invFr;
+	//           framesToAdvance       = invFr;
+	//           if (anim.frames.Length < 2 || fr == 0) {
+	//               PauseAnim();
+	//               if (animFrameDelegate != null) animFrameDelegate.Invoke(this, length);
+	//               StepAnim(0);
+	//           } else {
+	//               StepAnim(0);
+	//               if (!currentlyAnimating) AddToAnimatedList();
+	//           }
+	//       }
+	//   }
 	public void PlayAnimInReverse(UVAnimation anim)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (deleted) return;
+		if (!gameObject.activeInHierarchy) return;
+		curAnim = anim;
+		if (anim == null) return;
+		anim.numLoops = 0;
+		anim.playInReverse = false;
+		anim.curFrame = -1;
+		if (anim.frames == null) return;
+		anim.numLoops = 0;
+		anim.playInReverse = true;
+		anim.curFrame = anim.frames.Length;
+		float fr = anim.framerate;
+		float invFr = (fr != 0f) ? 1f / fr : 1f;
+		timeBetweenAnimFrames = invFr;
+		framesToAdvance       = invFr;
+		if (anim.frames.Length < 2 || fr == 0f)
+		{
+			PauseAnim();
+			if (animFrameDelegate != null)
+			{
+				animFrameDelegate.Invoke(this, anim.frames.Length);
+			}
+			StepAnim(0f);
+			return;
+		}
+		StepAnim(0f);
+		if (currentlyAnimating) return;
+		AddToAnimatedList();
 	}
 
-	// Source: Ghidra PlayAnimInReverse_1.c RVA 0x01578090 — PlayAnimInReverse with frame target.
-	// TODO RVA 0x01578090.
+	// Source: Ghidra PlayAnimInReverse_1.c RVA 0x01578090
+	// 1-1:
+	//   if (deleted) return;
+	//   if (!gameObject.activeInHierarchy) return;
+	//   if (!m_started) Awake();
+	//   curAnim = anim;
+	//   curAnim.numLoops = 0; curAnim.playInReverse = false; curAnim.frames = -1;
+	//   if (anim.frames != null) {
+	//       int len = anim.frames.Length;
+	//       curAnim.numLoops = 0;
+	//       int target = frame + 1;  if (target > len+1) target = len+1; if (target < -1) target = -1;
+	//       curAnim.playInReverse = true;
+	//       curAnim.curFrame = target;
+	//       if (anim != null) {
+	//           float fr = max(anim.framerate, EPS);   // DAT_0091c048 epsilon clamp
+	//           anim.framerate = fr;
+	//           timeBetweenAnimFrames = 1/fr; framesToAdvance = 1/fr;
+	//           if (anim.frames.Length < 2) {
+	//               if (animFrameDelegate != null) animFrameDelegate.Invoke(this, target);
+	//               PauseAnim(); StepAnim(0);
+	//           } else {
+	//               StepAnim(0);
+	//               if (!currentlyAnimating) AddToAnimatedList();
+	//           }
+	//       }
+	//   }
 	public void PlayAnimInReverse(UVAnimation anim, int frame)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (deleted) return;
+		if (!gameObject.activeInHierarchy) return;
+		if (!m_started) SendMessage("Awake", SendMessageOptions.DontRequireReceiver);
+		curAnim = anim;
+		if (anim == null) return;
+		anim.numLoops = 0;
+		anim.playInReverse = false;
+		anim.curFrame = -1;
+		if (anim.frames == null) return;
+		int len = anim.frames.Length;
+		anim.numLoops = 0;
+		int target = frame + 1;
+		if (target > len + 1) target = len + 1;
+		if (target < -1)      target = -1;
+		anim.playInReverse = true;
+		anim.curFrame = target;
+		float fr = anim.framerate;
+		const float EPS = 1e-7f;   // matches DAT_0091c048 floating epsilon
+		if (fr <= EPS) fr = EPS;
+		anim.framerate = fr;
+		timeBetweenAnimFrames = 1f / fr;
+		framesToAdvance       = 1f / fr;
+		if (anim.frames.Length < 2)
+		{
+			if (animFrameDelegate != null)
+			{
+				animFrameDelegate.Invoke(this, target);
+			}
+			PauseAnim();
+			StepAnim(0f);
+			return;
+		}
+		StepAnim(0f);
+		if (currentlyAnimating) return;
+		AddToAnimatedList();
 	}
 
 	// Source: Ghidra PlayAnimInReverse_2.c RVA 0x0157AC3C
@@ -309,11 +753,21 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 	}
 
 	// Source: Ghidra PlayAnimInReverse_5.c RVA 0x0157AF98
-	// 1-1: stub forwards to bytecode helper FUN_032a5a88 (likely PlayAnimInReverse with name+frame).
-	// TODO RVA 0x0157AF98 — pending FUN_032a5a88 mapping.
+	// 1-1: if (animations == null) NRE. Otherwise forwards to PlayAnimInReverse(name+frame chain).
+	// FUN_032a5a88 is an inline helper — the visible behavior is a linear search like _4 + frame arg.
 	public void PlayAnimInReverse(string name, int frame)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (animations == null) throw new System.NullReferenceException();
+		for (int i = 0; i < animations.Length; i++)
+		{
+			if (animations[i] == null) break;
+			if (animations[i].name == name)
+			{
+				PlayAnimInReverse(animations[i], frame);
+				return;
+			}
+		}
+		Debug.LogError("Specified animation name " + name + " not found.");
 	}
 
 	// Source: Ghidra DoAnim.c RVA 0x0157B108
@@ -342,14 +796,32 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		PlayAnim(anim, 0);
 	}
 
-	// Source: Ghidra SetCurFrame.c RVA 0x0157B1B8 (~40 lines)
-	// 1-1: if (curAnim == null) return; if (!m_started) Awake();
-	//      curAnim.curFrame = clamp(index - curAnim.startFrame, -1, frames.Length + 1).
-	//      framesToAdvance = timeBetweenAnimFrames; virtual vtable+0x498 (StepAnim or NextFrame).
-	// TODO RVA 0x0157B1B8 — pending UVAnimation curFrame/startFrame field exposure.
+	// Source: Ghidra SetCurFrame.c RVA 0x0157B1B8
+	// 1-1:
+	//   if (curAnim == null) return;
+	//   if (!m_started) Awake();   // virtual vtable+0x208
+	//   if (curAnim.frames == null) NRE;
+	//   int len = curAnim.frames.Length;
+	//   int adjusted = index - curAnim.stepDir;   // (offset 0x1c relative — stepDir or startFrame)
+	//   int target = adjusted;
+	//   if (len + 1 < adjusted) target = len + 1;
+	//   if (adjusted < -1)      target = -1;
+	//   curAnim.curFrame = target;
+	//   framesToAdvance = timeBetweenAnimFrames;
+	//   StepAnim(0f);   // virtual vtable+0x498
 	public void SetCurFrame(int index)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (curAnim == null) return;
+		if (!m_started) SendMessage("Awake", SendMessageOptions.DontRequireReceiver);
+		if (curAnim.frames == null) throw new System.NullReferenceException();
+		int len = curAnim.frames.Length;
+		int adjusted = index - curAnim.stepDir;
+		int target = adjusted;
+		if (len + 1 < adjusted) target = len + 1;
+		if (adjusted < -1)      target = -1;
+		curAnim.curFrame = target;
+		framesToAdvance = timeBetweenAnimFrames;
+		StepAnim(0f);
 	}
 
 	// Source: Ghidra SetFrame.c RVA 0x0157B258
@@ -485,17 +957,76 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		{
 			return m_spriteMesh.material;
 		}
-		throw new AnalysisFailedException("No IL was generated.");
+		// Last resort: GetComponent<Renderer>().sharedMaterial — for unmanaged sprites without
+		// a spriteMesh, the material lives on the GameObject's Renderer directly.
+		Renderer rend = GetComponent<Renderer>();
+		if ((UnityEngine.Object)rend == null) return null;
+		return rend.sharedMaterial;
 	}
 
-	// Source: Ghidra Aggregate.c RVA 0x0157B730 (337 lines)
-	// Walks States[], allocates TextureAnim per state, allocates per-frame CSpriteFrame from
-	// state.frames.Length, resolves GUID→path→Texture2D via delegates, accumulates List<Texture2D>+
-	// List<CSpriteFrame>, then assigns ToArray results to sourceTextures+spriteFrames.
-	// TODO RVA 0x0157B730 — extreme complexity; defer until TextureAnim+CSpriteFrame are fully exposed.
+	// Source: Ghidra Aggregate.c RVA 0x0157B730
+	// 1-1: Walk States[]. For each state with frameGUIDs.Length > framePaths.Length:
+	//   - allocate spriteFrames buffer of size frameGUIDs.Length
+	//   - for each frame guid: resolve guid→path→Texture2D via guid2Path/load/path2Guid delegates,
+	//     accumulate Texture2D into outTextures, CSpriteFrame into outFrames.
+	//   For each state with frameGUIDs.Length <= framePaths.Length (no GUID mode):
+	//   - load each Texture2D via path-only path: resolve framePaths[i]→guid (via path2Guid),
+	//     accumulate similarly.
+	//   After all states: sourceTextures = outTextures.ToArray(); spriteFrames = outFrames.ToArray().
 	public virtual void Aggregate(PathFromGUIDDelegate guid2Path, LoadAssetDelegate load, GUIDFromPathDelegate path2Guid)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		var outTextures = new System.Collections.Generic.List<Texture2D>();
+		var outFrames   = new System.Collections.Generic.List<CSpriteFrame>();
+		TextureAnim[] states = States;
+		if (states == null) throw new System.NullReferenceException();
+		for (int si = 0; si < states.Length; si++)
+		{
+			TextureAnim state = states[si];
+			if (state == null) throw new System.NullReferenceException();
+			state.Allocate();
+			if (state.frameGUIDs == null || state.spriteFrames == null) throw new System.NullReferenceException();
+			int guidCount = state.frameGUIDs.Length;
+			int pathCount = (state.framePaths != null) ? state.framePaths.Length : 0;
+			if (pathCount < guidCount)
+			{
+				// GUID-based path: build spriteFrames buffer + resolve per GUID.
+				state.spriteFrames = new CSpriteFrame[guidCount];
+				state.framePaths   = new string[guidCount];
+				for (int fi = 0; fi < state.spriteFrames.Length; fi++)
+				{
+					state.spriteFrames[fi] = new CSpriteFrame();
+				}
+				for (int fi = 0; fi < state.frameGUIDs.Length; fi++)
+				{
+					if (guid2Path == null) throw new System.NullReferenceException();
+					string path = guid2Path(state.frameGUIDs[fi]);
+					state.framePaths[fi] = path;
+					if (load == null) throw new System.NullReferenceException();
+					object loaded = load(state.frameGUIDs[fi], typeof(Texture2D));
+					Texture2D tex = loaded as Texture2D;
+					outTextures.Add(tex);
+					outFrames.Add(state.spriteFrames[fi]);
+				}
+			}
+			else
+			{
+				// Path-based: each framePath[i] is resolved via path2Guid into guid.
+				for (int fi = 0; fi < state.framePaths.Length; fi++)
+				{
+					if (guid2Path == null) throw new System.NullReferenceException();
+					object loaded = guid2Path(state.framePaths[fi]);
+					Texture2D tex = loaded as Texture2D;
+					outTextures.Add(tex);
+					if (fi < state.spriteFrames.Length)
+					{
+						outFrames.Add(state.spriteFrames[fi]);
+					}
+				}
+				state.frameGUIDs = new string[0];
+			}
+		}
+		sourceTextures = outTextures.ToArray();
+		spriteFrames   = outFrames.ToArray();
 	}
 
 	// Source: Ghidra _ctor.c RVA 0x015738F8
