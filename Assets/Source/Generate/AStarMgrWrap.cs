@@ -44,11 +44,16 @@ public class AStarMgrWrap
 	[MonoPInvokeCallbackAttribute(typeof(LuaCSFunction))]
 	static int get_Instance(IntPtr L)
 	{
+		// HAND-FIX: must work for BOTH call styles:
+		//   1. RegFunction("get_Instance", ...) — Lua: `AStarMgr.get_Instance()` (0 args)
+		//   2. RegVar("Instance", get_Instance, null) — Lua: `AStarMgr.Instance` (tolua's
+		//      __index invokes the getter with 1 arg, the class table as "self").
+		// Auto-gen originally emitted ToLua.CheckArgsCount(L, 0) which is strict-zero and
+		// rejects path #2 with "no overload for method takes '1' arguments". Matched pattern
+		// of BinFileMgrWrap / ConfigMgrWrap / ResMgrWrap / … (no arg-count check, just push).
 		try
 		{
-			ToLua.CheckArgsCount(L, 0);
-			AStarMgr o = AStarMgr.get_Instance();
-			ToLua.Push(L, o);
+			ToLua.PushObject(L, AStarMgr.Instance);
 			return 1;
 		}
 		catch (Exception e)
