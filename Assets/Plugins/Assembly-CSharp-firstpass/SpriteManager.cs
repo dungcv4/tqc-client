@@ -273,12 +273,25 @@ public class SpriteManager : MonoBehaviour
             sprites[i].cv2 = sprites[i].mv2;
             sprites[i].cv3 = sprites[i].mv3;
             sprites[i].cv4 = sprites[i].mv4;
-            triIndices[i * 6 + 0] = i * 4 + 0;
-            triIndices[i * 6 + 1] = i * 4 + 1;
-            triIndices[i * 6 + 2] = i * 4 + 2;
-            triIndices[i * 6 + 3] = i * 4 + 2;
-            triIndices[i * 6 + 4] = i * 4 + 3;
-            triIndices[i * 6 + 5] = i * 4 + 0;
+            // Source: Ghidra EnlargeArrays.c lines 236-246 (RVA 0x01574078).
+            // Per-slot triangle index pattern (iVar17=slot*4+0, iVar1=+1, iVar2=+2, iVar3=+3):
+            //   triIndices[uVar10-5] = iVar17  → slot*4 + 0  (TL)
+            //   triIndices[uVar10-4] = iVar3   → slot*4 + 3  (TR)
+            //   triIndices[uVar10-3] = iVar1   → slot*4 + 1  (BL)
+            //   triIndices[uVar10-2] = iVar3   → slot*4 + 3  (TR)
+            //   triIndices[uVar10-1] = iVar2   → slot*4 + 2  (BR)
+            //   triIndices[uVar10-0] = iVar1   → slot*4 + 1  (BL)
+            // Triangles:  (TL, TR, BL) and (TR, BR, BL).
+            // With verts v0=TL(-w/2,h/2), v1=BL(-w/2,-h/2), v2=BR(w/2,-h/2), v3=TR(w/2,h/2)
+            // Normal of (TL,TR,BL) = (v3-v0)×(v1-v0) = (w,0,0)×(0,-h,0) = (0,0,-hw) = -Z
+            // Negative Z → front face TOWARD camera (camera at lower Z looking +Z) → renders.
+            // Previous port had Tri1 = (TL, BL, BR) → normal +Z → back face → backface culled.
+            triIndices[i * 6 + 0] = i * 4 + 0;   // TL
+            triIndices[i * 6 + 1] = i * 4 + 3;   // TR
+            triIndices[i * 6 + 2] = i * 4 + 1;   // BL
+            triIndices[i * 6 + 3] = i * 4 + 3;   // TR
+            triIndices[i * 6 + 4] = i * 4 + 2;   // BR
+            triIndices[i * 6 + 5] = i * 4 + 1;   // BL
             if (availableBlocks != null) availableBlocks.Add(sprites[i]);
             SetupBoneWeights(sprites[i]);
         }
