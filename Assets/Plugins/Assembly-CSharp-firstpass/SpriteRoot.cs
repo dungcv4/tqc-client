@@ -221,12 +221,12 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	// Source: Ghidra get_Started.c RVA 0x01586224 — return m_started (offset 0x15c).
 	public bool Started { get { return m_started; } }
 
+	// Source: Ghidra get_ClippingRect.c RVA 0x01586938 — copy Rect3D struct from offset 0x100..0x130.
+	// 1-1 get: return clippingRect (Rect3D is 7 fields of 8 bytes = 56 bytes total).
+	// set: TODO — Ghidra has set body; pending Rect3D field-name mapping.
 	public virtual Rect3D ClippingRect
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return clippingRect; }
 		set
 		{
 			throw new AnalysisFailedException("No IL was generated.");
@@ -341,9 +341,26 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra CalcSizeUnitsPerUV.c RVA 0x01583E60
+	// 1-1:
+	//   if (uvRect.size.x == 0 || uvRect.size.y == 0 || (uvRect.size.x==1 && uvRect.position.y==1)) {
+	//       sizeUnitsPerUV = Vector2.zero;
+	//   } else {
+	//       sizeUnitsPerUV.x = width / uvRect.width;       // 0x44 / 0x74
+	//       sizeUnitsPerUV.y = height / uvRect.height;     // 0x48 / 0x78
+	//   }
+	// Ghidra also checks frameInfo.uvs at 0x6c/0x70/0x74/0x78 (same as uvRect — they're kept in sync).
 	protected void CalcSizeUnitsPerUV()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (uvRect.width == 0f || uvRect.height == 0f ||
+		    (uvRect.y == 1f && uvRect.x == 1f))
+		{
+			sizeUnitsPerUV = Vector2.zero;
+		}
+		else
+		{
+			sizeUnitsPerUV = new Vector2(width / uvRect.width, height / uvRect.height);
+		}
 	}
 
 	protected virtual void Init()
@@ -461,19 +478,44 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra SetColor.c RVA 0x01585340
+	// 1-1: color = c (offsets 0x16c..0x178); if (spriteMesh != null) spriteMesh.UpdateColors(c).
+	// Virtual call on spriteMesh at vtable+0xC slot (UpdateColors on ISpriteMesh).
 	public virtual void SetColor(Color c)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		color = c;
+		if (m_spriteMesh == null) return;
+		m_spriteMesh.UpdateColors(c);
 	}
 
+	// Source: Ghidra SetPixelToUV.c RVA 0x01585458
+	// 1-1:
+	//   float oldX = pixelsPerUV.x;  float oldY = pixelsPerUV.y;
+	//   pixelsPerUV.x = texWidth;    pixelsPerUV.y = texHeight;
+	//   if (oldX != 0 && oldY != 0 && uvRect.width != 0 && uvRect.height != 0) {
+	//       sizeUnitsPerUV.x = (width  / (oldX * uvRect.width))  * texWidth;
+	//       sizeUnitsPerUV.y = (height / (oldY * uvRect.height)) * texHeight;
+	//   }
 	public void SetPixelToUV(int texWidth, int texHeight)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		float oldX = pixelsPerUV.x;
+		float oldY = pixelsPerUV.y;
+		pixelsPerUV.x = (float)texWidth;
+		pixelsPerUV.y = (float)texHeight;
+		if (oldX != 0f && oldY != 0f && uvRect.width != 0f && uvRect.height != 0f)
+		{
+			sizeUnitsPerUV.x = (width  / (oldX * uvRect.width))  * (float)texWidth;
+			sizeUnitsPerUV.y = (height / (oldY * uvRect.height)) * (float)texHeight;
+		}
 	}
 
+	// Source: Ghidra SetPixelToUV_1.c RVA 0x01581EC4
+	// 1-1: if (tex == null/destroyed) return;
+	//      SetPixelToUV(tex.width, tex.height);   // tex.width = virtual vtable+0x188, tex.height = +0x1a8
 	public void SetPixelToUV(Texture tex)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if ((UnityEngine.Object)tex == null) return;
+		SetPixelToUV(tex.width, tex.height);
 	}
 
 	public void CalcPixelToUV()
@@ -481,14 +523,41 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra SetTexture.c RVA 0x015857A8
+	// 1-1:
+	//   if (managed) return;
+	//   if (_renderer == null/destroyed) return;
+	//   Material mat = _renderer.material;
+	//   mat.mainTexture = tex;
+	//   SetPixelToUV(tex);    // calls Texture overload
+	//   UpdateUVs();          // virtual vtable+0x368
 	public void SetTexture(Texture2D tex)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (managed) return;
+		if ((UnityEngine.Object)_renderer == null) return;
+		Material mat = _renderer.material;
+		if ((UnityEngine.Object)mat == null) throw new System.NullReferenceException();
+		mat.mainTexture = tex;
+		SetPixelToUV(tex);
+		UpdateUVs();
 	}
 
+	// Source: Ghidra SetMaterial.c RVA 0x01585880
+	// 1-1:
+	//   if (managed) return;
+	//   if (_renderer == null/destroyed) return;
+	//   _renderer.sharedMaterial = mat;
+	//   if (mat == null) NRE;
+	//   SetPixelToUV(mat.mainTexture);
+	//   UpdateUVs();
 	public void SetMaterial(Material mat)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (managed) return;
+		if ((UnityEngine.Object)_renderer == null) return;
+		_renderer.sharedMaterial = mat;
+		if ((UnityEngine.Object)mat == null) throw new System.NullReferenceException();
+		SetPixelToUV(mat.mainTexture);
+		UpdateUVs();
 	}
 
 	public void UpdateCamera()
@@ -539,9 +608,12 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra SetPlane.c RVA 0x01586294
+	// 1-1: plane = p (offset 0x3c); CalcSize() (virtual vtable+0x298).
 	public void SetPlane(SPRITE_PLANE p)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		plane = p;
+		CalcSize();
 	}
 
 	// Source: Ghidra SetWindingOrder.c RVA 0x015862AC
@@ -556,9 +628,23 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		// SpriteMesh.SetWindingOrder is exposed.
 	}
 
+	// Source: Ghidra SetDrawLayer.c RVA 0x0158634C
+	// 1-1:
+	//   if (!managed) return;
+	//   drawLayer = layer (offset 0x34);
+	//   if (spriteMesh == null) NRE;
+	//   ((SpriteMesh_Managed)spriteMesh).drawLayer = layer;     // offset 0x20 inside SpriteMesh_Managed
+	//   if (manager != null) manager.SortDrawingOrder();
 	public void SetDrawLayer(int layer)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (!managed) return;
+		drawLayer = layer;
+		if (m_spriteMesh == null) throw new System.NullReferenceException();
+		SpriteMesh_Managed sm = m_spriteMesh as SpriteMesh_Managed;
+		if (sm == null) throw new System.InvalidCastException();
+		sm.drawLayer = layer;
+		if ((UnityEngine.Object)manager == null) return;
+		manager.SortDrawingOrder();
 	}
 
 	public void SetFrameInfo(SPRITE_FRAME fInfo)
@@ -576,10 +662,9 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		throw new AnalysisFailedException("No IL was generated.");
 	}
 
-	public Rect GetUVs()
-	{
-		throw new AnalysisFailedException("No IL was generated.");
-	}
+	// Source: Ghidra GetUVs.c RVA 0x01586650 — return uvRect (offset 0x94, 16 bytes; Ghidra simplifies
+	// to single float — full Rect derived from C# signature).
+	public Rect GetUVs() { return uvRect; }
 
 	public Vector3[] GetVertices()
 	{
@@ -591,14 +676,20 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra SetAnchor.c RVA 0x01586AC4
+	// 1-1: anchor = a (offset 0x54); CalcSize() (virtual vtable+0x298).
 	public void SetAnchor(ANCHOR_METHOD a)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		anchor = a;
+		CalcSize();
 	}
 
+	// Source: Ghidra SetOffset.c RVA 0x01586AFC
+	// 1-1: offset = o (Vector3 at offsets 0x160, 0x164, 0x168); CalcSize() (virtual vtable+0x298).
 	public void SetOffset(Vector3 o)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		offset = o;
+		CalcSize();
 	}
 
 	public abstract Vector2 GetDefaultPixelSize(PathFromGUIDDelegate guid2Path, AssetLoaderDelegate loader);
