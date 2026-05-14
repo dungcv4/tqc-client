@@ -227,26 +227,41 @@ public static class InMapStateLogger
                     }
                     sb.AppendLine();
 
-                    // DIAG: dump first 4 mesh verts + first 4 UVs to see if sprite slot has valid data.
+                    // DIAG: dump ALL bone slots + which have non-zero verts. Find the actually-used slot.
                     if (smr != null && smr.sharedMesh != null && smr.sharedMesh.vertexCount >= 4)
                     {
                         var verts = smr.sharedMesh.vertices;
                         var uvs = smr.sharedMesh.uv;
-                        sb.Append("        slot0 verts: ");
-                        for (int vi = 0; vi < 4; vi++) sb.Append(verts[vi].ToString("F2")).Append(" ");
-                        sb.AppendLine();
-                        if (uvs != null && uvs.Length >= 4)
-                        {
-                            sb.Append("        slot0 uvs:   ");
-                            for (int vi = 0; vi < 4; vi++) sb.Append(uvs[vi].ToString("F3")).Append(" ");
-                            sb.AppendLine();
-                        }
                         var bones = smr.bones;
-                        sb.Append("        bones: ").Append(bones != null ? bones.Length : -1)
-                          .Append(" rootBone=").Append(smr.rootBone != null ? smr.rootBone.name : "<null>");
-                        if (bones != null && bones.Length > 0 && bones[0] != null)
-                            sb.Append(" bones[0]=").Append(bones[0].name).Append("@").Append(bones[0].position.ToString("F1"));
-                        sb.AppendLine();
+                        sb.Append("        bones[").Append(bones != null ? bones.Length : 0)
+                          .Append("] rootBone=").Append(smr.rootBone != null ? smr.rootBone.name : "<null>").AppendLine();
+                        int slotsToScan = verts.Length / 4;
+                        for (int s = 0; s < slotsToScan; s++)
+                        {
+                            int baseV = s * 4;
+                            // Skip empty all-zero slots when summarizing — but record at least 1.
+                            bool vertsZero = verts[baseV] == Vector3.zero && verts[baseV + 1] == Vector3.zero
+                                          && verts[baseV + 2] == Vector3.zero && verts[baseV + 3] == Vector3.zero;
+                            bool uvsZero = uvs != null && uvs.Length > baseV + 3
+                                          && uvs[baseV] == Vector2.zero && uvs[baseV + 1] == Vector2.zero
+                                          && uvs[baseV + 2] == Vector2.zero && uvs[baseV + 3] == Vector2.zero;
+                            string bone = (bones != null && s < bones.Length && bones[s] != null)
+                                ? (bones[s].name + "@" + bones[s].position.ToString("F1"))
+                                : "<null>";
+                            if (vertsZero && uvsZero)
+                            {
+                                sb.Append("        slot").Append(s).Append(": EMPTY  bone=").Append(bone).AppendLine();
+                            }
+                            else
+                            {
+                                sb.Append("        slot").Append(s).Append(": verts[0]=").Append(verts[baseV].ToString("F1"))
+                                  .Append(" verts[2]=").Append(verts[baseV + 2].ToString("F1"));
+                                if (uvs != null && uvs.Length > baseV + 3)
+                                    sb.Append(" uv[0]=").Append(uvs[baseV].ToString("F3"))
+                                      .Append(" uv[2]=").Append(uvs[baseV + 2].ToString("F3"));
+                                sb.Append(" bone=").Append(bone).AppendLine();
+                            }
+                        }
                     }
                 }
             }
