@@ -194,7 +194,9 @@ public class SpriteManager : MonoBehaviour
         sprites[0] = new SpriteMesh_Managed();
         vertices    = new UnityEngine.Vector3[4];
         UVs         = new UnityEngine.Vector2[4];
-        UVs2        = new UnityEngine.Vector2[4];
+        // 0xc0 = colors[] (NOT UVs2). LateUpdate writes Mesh.colors = this+0xc0 confirming
+        // the field at 0xc0 is the Color buffer. UVs2 is lazily allocated by the UseUV2 path.
+        colors      = new UnityEngine.Color[4];
         triIndices  = new int[6];
         boneWeights = new UnityEngine.BoneWeight[4];
         sprites[0].index = 0;
@@ -245,9 +247,10 @@ public class SpriteManager : MonoBehaviour
         System.Array.Resize(ref bindPoses, newCnt);
         System.Array.Resize(ref vertices,    newCnt * 4);
         System.Array.Resize(ref UVs,         newCnt * 4);
-        System.Array.Resize(ref UVs2,        newCnt * 4);
+        System.Array.Resize(ref colors,      newCnt * 4);
         System.Array.Resize(ref triIndices,  newCnt * 6);
         System.Array.Resize(ref boneWeights, newCnt * 4);
+        if (UVs2 != null) System.Array.Resize(ref UVs2, newCnt * 4);   // optional, only if previously allocated
         for (int i = oldCnt; i < newCnt; i++)
         {
             sprites[i] = new SpriteMesh_Managed();
@@ -532,8 +535,72 @@ public class SpriteManager : MonoBehaviour
         return meshRenderer;
     }
 
-    // RVA: 0x1576BE4  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/LateUpdate.c
-    public virtual void LateUpdate() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/LateUpdate.c RVA 0x1576BE4
+    // 1-1 — two branches:
+    //   if (vertCountChanged) {                             // big rebuild — flush every buffer
+    //       updateBounds = false;
+    //       vertsChanged = uvsChanged = colorsChanged = vertCountChanged = false;
+    //       meshRenderer.bones      = bones;                // SkinnedMeshRenderer.set_bones
+    //       mesh.Clear();
+    //       mesh.vertices    = vertices;
+    //       mesh.bindposes   = bindPoses;
+    //       mesh.boneWeights = boneWeights;
+    //       mesh.uv          = UVs;
+    //       mesh.colors      = colors;                       // 0xc0
+    //       mesh.triangles   = triIndices;                   // 0xa8
+    //       mesh.RecalculateNormals();
+    //       if (autoUpdateBounds) mesh.RecalculateBounds();
+    //   }
+    //   else {                                              // partial updates
+    //       if (vertsChanged)   { vertsChanged = false; if (autoUpdateBounds) updateBounds = true; mesh.vertices = vertices; }
+    //       if (updateBounds)   { mesh.RecalculateBounds(); updateBounds = false; }
+    //       if (colorsChanged)  { colorsChanged = false; mesh.colors = colors; }
+    //       if (uvsChanged)     { uvsChanged = false; mesh.uv = UVs; }
+    //   }
+    public virtual void LateUpdate()
+    {
+        if ((UnityEngine.Object)mesh == null) return;        // nothing wired yet — Awake hasn't run
+        if (vertCountChanged)
+        {
+            updateBounds     = false;
+            vertsChanged     = false;
+            uvsChanged       = false;
+            colorsChanged    = false;
+            vertCountChanged = false;
+            if ((UnityEngine.Object)meshRenderer != null) meshRenderer.bones = bones;
+            mesh.Clear();
+            mesh.vertices    = vertices;
+            mesh.bindposes   = bindPoses;
+            mesh.boneWeights = boneWeights;
+            mesh.uv          = UVs;
+            mesh.colors      = colors;
+            mesh.triangles   = triIndices;
+            mesh.RecalculateNormals();
+            if (autoUpdateBounds) mesh.RecalculateBounds();
+            return;
+        }
+        if (vertsChanged)
+        {
+            vertsChanged = false;
+            if (autoUpdateBounds) updateBounds = true;
+            mesh.vertices = vertices;
+        }
+        if (updateBounds)
+        {
+            mesh.RecalculateBounds();
+            updateBounds = false;
+        }
+        if (colorsChanged)
+        {
+            colorsChanged = false;
+            mesh.colors = colors;
+        }
+        if (uvsChanged)
+        {
+            uvsChanged = false;
+            mesh.uv = UVs;
+        }
+    }
 
     // RVA: 0x1576D64  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/DoMirror.c
     public virtual void DoMirror() { throw new System.NotImplementedException(); }
