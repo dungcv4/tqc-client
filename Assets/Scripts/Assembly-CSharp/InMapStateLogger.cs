@@ -184,21 +184,46 @@ public static class InMapStateLogger
                         else sb.Append(" mat=NULL");
                     }
                     else sb.Append(" NO-RENDERER");
-                    var mf = go.GetComponent<MeshFilter>();
-                    if (mf != null && mf.sharedMesh != null)
-                        sb.Append(" MESH:").Append(mf.sharedMesh.vertexCount).Append("v");
+                    // SpriteManager uses SkinnedMeshRenderer.sharedMesh (NOT MeshFilter).
+                    var smr = go.GetComponent<SkinnedMeshRenderer>();
+                    if (smr != null && smr.sharedMesh != null)
+                    {
+                        sb.Append(" MESH:").Append(smr.sharedMesh.vertexCount).Append("v ")
+                          .Append(smr.sharedMesh.subMeshCount).Append("sub");
+                        try { var b = smr.localBounds; sb.Append(" bounds=").Append(b.size.ToString("F1")); } catch { }
+                    }
                     else
-                        sb.Append(" NO-MESH");
-                    // SpriteManager.sprites field (reflection — public List<Sprite> sprites)
-                    var spritesField = smType.GetField("sprites", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    {
+                        var mf = go.GetComponent<MeshFilter>();
+                        if (mf != null && mf.sharedMesh != null)
+                            sb.Append(" MESH(MF):").Append(mf.sharedMesh.vertexCount).Append("v");
+                        else
+                            sb.Append(" NO-MESH");
+                    }
+                    // SpriteManager.sprites: 'protected SpriteMesh_Managed[] sprites' (NonPublic).
+                    const System.Reflection.BindingFlags BF = System.Reflection.BindingFlags.Public
+                        | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance;
+                    var spritesField = smType.GetField("sprites", BF);
                     if (spritesField != null)
                     {
                         var spritesVal = spritesField.GetValue(comp);
-                        if (spritesVal != null)
-                        {
-                            var arr = spritesVal as System.Array;
-                            if (arr != null) sb.Append(" sprites[").Append(arr.Length).Append("]");
-                        }
+                        var arr = spritesVal as System.Array;
+                        if (arr != null) sb.Append(" sprites[").Append(arr.Length).Append("]");
+                        else if (spritesVal == null) sb.Append(" sprites=NULL");
+                        else sb.Append(" sprites=").Append(spritesVal.GetType().Name);
+                    }
+                    else sb.Append(" no-sprites-field");
+                    // SpriteManager.initialized flag — Awake() sets this true after EnlargeArrays.
+                    var initField = smType.GetField("initialized", BF);
+                    if (initField != null)
+                        sb.Append(" init=").Append(initField.GetValue(comp));
+                    // SpriteManager.activeBlock — bitmask of used slots (via reflection).
+                    var activeBlockField = smType.GetField("activeBlock", BF);
+                    if (activeBlockField != null)
+                    {
+                        var ab = activeBlockField.GetValue(comp);
+                        if (ab != null)
+                            sb.Append(" activeBlock=").Append(ab.GetType().Name);
                     }
                     sb.AppendLine();
                 }
