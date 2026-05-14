@@ -511,10 +511,8 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		throw new AnalysisFailedException("No IL was generated.");
 	}
 
-	public bool IsHidden()
-	{
-		throw new AnalysisFailedException("No IL was generated.");
-	}
+	// Source: Ghidra IsHidden.c RVA 0x01585E3C — return m_hidden (byte at offset 0x1d9).
+	public bool IsHidden() { return m_hidden; }
 
 	protected void DestroyMesh()
 	{
@@ -546,9 +544,16 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra SetWindingOrder.c RVA 0x015862AC
+	// 1-1: winding = order (offset 0x40). If !managed && spriteMesh != null, dispatch virtual
+	// vtable+0x388 on spriteMesh (ISpriteMesh.SetWindingOrder). Type-cast checked via klass.
 	public void SetWindingOrder(WINDING_ORDER order)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		winding = order;
+		if (managed) return;
+		// TODO: spriteMesh virtual vtable+0x388 (SetWindingOrder on SpriteMesh implementation) —
+		// no public C# property for this on ISpriteMesh interface yet. Stays a no-op until
+		// SpriteMesh.SetWindingOrder is exposed.
 	}
 
 	public void SetDrawLayer(int layer)
@@ -598,25 +603,28 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 
 	public abstract Vector2 GetDefaultPixelSize(PathFromGUIDDelegate guid2Path, AssetLoaderDelegate loader);
 
+	// Source: Ghidra PixelSpaceToUVSpace.c RVA 0x01586230
+	// 1-1: if (pixelsPerUV.x == 0 || pixelsPerUV.y == 0) return Vector2.zero;
+	//      return new Vector2(xy.x / pixelsPerUV.x, xy.y / pixelsPerUV.y);
+	// Ghidra simplifies to single float; full Vector2 inferred from signature.
 	public Vector2 PixelSpaceToUVSpace(Vector2 xy)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (pixelsPerUV.x == 0f || pixelsPerUV.y == 0f) return Vector2.zero;
+		return new Vector2(xy.x / pixelsPerUV.x, xy.y / pixelsPerUV.y);
 	}
 
-	public Vector2 PixelSpaceToUVSpace(int x, int y)
-	{
-		throw new AnalysisFailedException("No IL was generated.");
-	}
+	// Source: Ghidra PixelSpaceToUVSpace_1.c RVA 0x01586DBC — calls Vector2 overload with (float)x, (float)y.
+	public Vector2 PixelSpaceToUVSpace(int x, int y) { return PixelSpaceToUVSpace(new Vector2(x, y)); }
 
+	// Source: Ghidra PixelCoordToUVCoord.c RVA 0x01586DC8 — identical body to PixelSpaceToUVSpace.
 	public Vector2 PixelCoordToUVCoord(Vector2 xy)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (pixelsPerUV.x == 0f || pixelsPerUV.y == 0f) return Vector2.zero;
+		return new Vector2(xy.x / pixelsPerUV.x, xy.y / pixelsPerUV.y);
 	}
 
-	public Vector2 PixelCoordToUVCoord(int x, int y)
-	{
-		throw new AnalysisFailedException("No IL was generated.");
-	}
+	// Source: Ghidra PixelCoordToUVCoord_1.c RVA 0x01586644 — calls Vector2 overload with (float)x, (float)y.
+	public Vector2 PixelCoordToUVCoord(int x, int y) { return PixelCoordToUVCoord(new Vector2(x, y)); }
 
 	public abstract int GetStateIndex(string stateName);
 
