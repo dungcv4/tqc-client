@@ -150,6 +150,12 @@ public static class InMapStateLogger
                 bool sees = (c.cullingMask & (1 << playerLayer)) != 0;
                 sb.Append("    visible to ").Append(c.name).Append("? ").Append(sees).AppendLine();
             }
+
+            // 6b. DIAG: dump PLAYER hierarchy + renderers + sprite components so we can see
+            //     WHY the sprite doesn't draw. Likely culprits: no Renderer, mesh has 0 verts,
+            //     material null, sprite frame uvs all zero, scale zero, etc.
+            sb.AppendLine("  PLAYER-100001 hierarchy + components:");
+            DumpGoTree(sb, playerGo.transform, "    ", 0, 5);
         }
         else
         {
@@ -257,5 +263,59 @@ public static class InMapStateLogger
         sb.AppendLine();
         for (int i = 0; i < t.childCount && i < 30; i++)
             DumpTree(sb, t.GetChild(i), depth + 1, maxDepth);
+    }
+
+    // For PLAYER sub-tree: log GameObject + renderers + sprite components so we see why nothing draws.
+    static void DumpGoTree(StringBuilder sb, Transform t, string indent, int depth, int maxDepth)
+    {
+        if (depth > maxDepth) return;
+        sb.Append(indent).Append(t.name)
+          .Append(" active=").Append(t.gameObject.activeSelf)
+          .Append(" layer=").Append(t.gameObject.layer)
+          .Append(" scale=").Append(t.localScale.ToString("F2"))
+          .Append(" pos=").Append(t.position.ToString("F1"));
+        // Renderer info — bounds, material, enabled
+        var renderer = t.GetComponent<Renderer>();
+        if (renderer != null)
+        {
+            sb.Append(" RENDERER:").Append(renderer.GetType().Name)
+              .Append(" enabled=").Append(renderer.enabled)
+              .Append(" sortingOrder=").Append(renderer.sortingOrder);
+            try
+            {
+                var b = renderer.bounds;
+                sb.Append(" bounds=").Append(b.center.ToString("F1")).Append("±").Append(b.size.ToString("F1"));
+            }
+            catch { }
+            if (renderer.sharedMaterial != null)
+                sb.Append(" mat=").Append(renderer.sharedMaterial.name);
+            else
+                sb.Append(" mat=NULL");
+        }
+        // MeshFilter
+        var mf = t.GetComponent<MeshFilter>();
+        if (mf != null && mf.sharedMesh != null)
+        {
+            sb.Append(" MESH:").Append(mf.sharedMesh.vertexCount).Append("v");
+        }
+        else if (mf != null)
+        {
+            sb.Append(" MESH:NULL");
+        }
+        // SpriteBase / PackedSprite / TextureAnim — anything in SpriteManager 2 stack
+        var sb_comp = t.GetComponent("SpriteBase");
+        if (sb_comp != null) sb.Append(" [has SpriteBase]");
+        var ps_comp = t.GetComponent("PackedSprite");
+        if (ps_comp != null) sb.Append(" [has PackedSprite]");
+        var sm_comp = t.GetComponent("SpriteManager");
+        if (sm_comp != null) sb.Append(" [has SpriteManager]");
+        var au_comp = t.GetComponent("AutoSpriteBase");
+        if (au_comp != null) sb.Append(" [has AutoSpriteBase]");
+        sb.AppendLine();
+
+        // Recurse
+        for (int i = 0; i < t.childCount && i < 30; i++)
+            DumpGoTree(sb, t.GetChild(i), indent + "  ", depth + 1, maxDepth);
+        if (t.childCount > 30) sb.Append(indent).Append("  ").Append("… (+").Append(t.childCount - 30).AppendLine(" more)");
     }
 }
