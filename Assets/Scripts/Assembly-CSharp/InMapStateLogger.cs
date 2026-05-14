@@ -217,7 +217,34 @@ public static class InMapStateLogger
                 DumpField(sb, srType, c, "bottomRightOffset", BFR);
                 sb.AppendLine();
 
-                // DIAG: dump PackedSprite._ser_stat_frame_info (the serialized CSpriteFrame from prefab).
+                // DIAG: also dump animations[] and textureAnimations[] lengths + curAnim
+                // (verify AutoSpriteBase.Awake loop built UVAnimation[] from textureAnimations).
+                if (psType != null && psType.IsInstanceOfType(c))
+                {
+                    var anField = psType.GetField("animations", BFR);
+                    var taField = psType.GetField("textureAnimations", BFR);
+                    var curField = psType.GetField("curAnim", BFR);
+                    var defField = psType.GetField("defaultAnim", BFR);
+                    sb.Append("        anims: ");
+                    if (anField != null)
+                    {
+                        var arr = anField.GetValue(c) as System.Array;
+                        sb.Append("animations[").Append(arr != null ? arr.Length : -1).Append("] ");
+                    }
+                    if (taField != null)
+                    {
+                        var arr = taField.GetValue(c) as System.Array;
+                        sb.Append("textureAnimations[").Append(arr != null ? arr.Length : -1).Append("] ");
+                    }
+                    if (defField != null)
+                        sb.Append("defaultAnim=").Append(defField.GetValue(c)).Append(" ");
+                    if (curField != null)
+                    {
+                        var cur = curField.GetValue(c);
+                        sb.Append("curAnim=").Append(cur == null ? "<null>" : cur.ToString());
+                    }
+                    sb.AppendLine();
+                }
                 if (psType != null && psType.IsInstanceOfType(c))
                 {
                     var serField = psType.GetField("_ser_stat_frame_info", BFR);
