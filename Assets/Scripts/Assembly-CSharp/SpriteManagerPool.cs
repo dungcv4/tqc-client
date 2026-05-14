@@ -730,39 +730,35 @@ public class SpriteManagerPool : MonoBehaviour
 	}
 
 	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/checkShadow.c RVA 0x18E3E3C
-	// 1-1 mapping:
-	//   if (shadowManager (static @ +8) == null) {
-	//       GameObject prefab = Resources.Load("Prefabs/model/shadow");      // lit 9185
+	// String literals verified against work/03_il2cpp_dump/stringliteral.json:
+	//   index 9185 = "Prefabs/model/ShadowManager"   (the SpriteManager-holder GameObject)
+	//   index 9186 = "Prefabs/model/shadow"           (the PackedSprite template to clone)
+	//   index 15214 = "background"                    (LayerMask for the manager GameObject)
+	// 1-1:
+	//   if (shadowManager == null) {
+	//       GameObject prefab = Resources.Load("Prefabs/model/ShadowManager");     // lit 9185
 	//       if (prefab != null) {
 	//           Camera mainCam = Camera.main;
 	//           if (mainCam != null) {
-	//               Transform p = mainCam.gameObject.transform;
-	//               GameObject inst = Instantiate(prefab, p);
-	//               shadowManager = (inst != null && inst is GameObject) ? inst : null;
+	//               GameObject inst = Instantiate(prefab, mainCam.gameObject.transform);
+	//               shadowManager = (inst is GameObject) ? inst : null;
 	//               if (shadowManager != null) {
 	//                   SpriteManager smComp = shadowManager.GetComponent<SpriteManager>();
 	//                   if (smComp != null) {
 	//                       Renderer rnd = smComp.GetComponent<Renderer>();
 	//                       if (rnd != null && rnd.material != null) rnd.sortingOrder = 1;
 	//                   }
-	//                   shadowManager.layer = LayerMask.NameToLayer("background");  // lit 15214
+	//                   shadowManager.layer = LayerMask.NameToLayer("background");
 	//               }
 	//           }
 	//       }
 	//   }
-	//   if (shadowPrefab (static @ +0x10) == null) {
-	//       shadowPrefab = Resources.Load("Prefabs/model/ShadowManager") as GameObject;  // lit 9186
-	//   }
-	// (lit 9185 "Prefabs/model/shadow" → shadowManager instance template,
-	//  lit 9186 "Prefabs/model/ShadowManager" → shadowPrefab cache)
-	// NOTE: Ghidra reads PTR_StringLiteral_9185 for the FIRST Resources.Load (the manager
-	// instance) and PTR_StringLiteral_9186 for the SECOND (the prefab cache); the names are
-	// swapped relative to the field names so I follow Ghidra exactly.
+	//   if (shadowPrefab == null) shadowPrefab = Resources.Load("Prefabs/model/shadow") as GameObject;  // lit 9186
 	private void checkShadow()
 	{
 		if ((UnityEngine.Object)shadowManager == null)
 		{
-			UnityEngine.GameObject prefab = UnityEngine.Resources.Load("Prefabs/model/shadow") as UnityEngine.GameObject;
+			UnityEngine.GameObject prefab = UnityEngine.Resources.Load("Prefabs/model/ShadowManager") as UnityEngine.GameObject;
 			if ((UnityEngine.Object)prefab != null)
 			{
 				UnityEngine.Camera mainCam = UnityEngine.Camera.main;
@@ -793,7 +789,7 @@ public class SpriteManagerPool : MonoBehaviour
 		}
 		if ((UnityEngine.Object)shadowPrefab == null)
 		{
-			shadowPrefab = UnityEngine.Resources.Load("Prefabs/model/ShadowManager") as UnityEngine.GameObject;
+			shadowPrefab = UnityEngine.Resources.Load("Prefabs/model/shadow") as UnityEngine.GameObject;
 		}
 	}
 
