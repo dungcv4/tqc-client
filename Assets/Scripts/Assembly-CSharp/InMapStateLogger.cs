@@ -69,6 +69,8 @@ public static class InMapStateLogger
             Transform pt = c.transform.parent;
             while (pt != null) { parentPath = pt.name + "/" + parentPath; pt = pt.parent; }
             sb.Append("  - ").Append(parentPath)
+              .Append(" tag='").Append(c.tag).Append("'")
+              .Append(" hasPlayerCamControl=").Append(c.GetComponent<PlayerCamControl>() != null)
               .Append(" scene='").Append(c.gameObject.scene.name).Append("'")
               .Append(" enabled=").Append(c.enabled)
               .Append(" depth=").Append(c.depth)
@@ -170,6 +172,32 @@ public static class InMapStateLogger
               .Append("  CAMZ_DIS=").Append(pcc.CAMZ_DIS).AppendLine();
         }
         else sb.AppendLine("PlayerCamControl.Instance NULL");
+
+        // 8. What does FindGameObjectWithTag("MainCamera") return? (Production SetupScreenSize
+        //    finds it and AttachComponent<PlayerCamControl> to it. If the wrong GO has this tag,
+        //    PlayerCamControl gets attached to the wrong camera GO and the move never happens
+        //    on the actual rendering camera.) Also dump Main._MainCamera if available.
+        GameObject taggedMain = GameObject.FindGameObjectWithTag("MainCamera");
+        if (taggedMain != null)
+        {
+            string p = taggedMain.name;
+            Transform pt2 = taggedMain.transform.parent;
+            while (pt2 != null) { p = pt2.name + "/" + p; pt2 = pt2.parent; }
+            sb.Append("FindGameObjectWithTag(\"MainCamera\") → ").Append(p)
+              .Append("  pos=").Append(taggedMain.transform.position.ToString("F1"))
+              .AppendLine();
+        }
+        else sb.AppendLine("FindGameObjectWithTag(\"MainCamera\") → null");
+
+        if (Main.Instance != null && Main.Instance.mainCamera != null)
+        {
+            var mc = Main.Instance.mainCamera;
+            sb.Append("Main.Instance.mainCamera → ").Append(mc.name)
+              .Append(" tag='").Append(mc.tag).Append("'")
+              .Append(" pos=").Append(mc.transform.position.ToString("F1"))
+              .AppendLine();
+        }
+        else sb.AppendLine("Main.Instance.mainCamera NULL or Main.Instance NULL");
 
         sb.AppendLine("==== [InMapStateLogger] END ====");
         UJDebug.Log(sb.ToString());
