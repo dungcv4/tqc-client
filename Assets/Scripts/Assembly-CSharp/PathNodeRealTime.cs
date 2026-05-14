@@ -90,8 +90,19 @@ public class PathNodeRealTime : IPathNode<PathNodeRealTime>
         return new Vector2(position.x * 64f, position.y * 64f);
     }
 
-    // Source: Ghidra (no .ctor.c) — default ctor.
-    public PathNodeRealTime() { }
+    // Source: Ghidra work/06_ghidra/decompiled_full/PathNodeRealTime/_ctor.c RVA 0x15ACF18
+    // 1-1 mapping:
+    //   uVar3 = il2cpp_object_new(System.Collections.Generic.List<PathNodeRealTime>);
+    //   List<>..ctor(uVar3);                       // empty-list ctor
+    //   *(this + 0x10) = uVar3;                    // connections = uVar3
+    //   System.Object..ctor(this);                 // base
+    // Without this, AStarMgr.SpawnNodes raised NullReferenceException on
+    // `srcNode.connections.Add(dstNode)` every node-spawn → OnMapLoadFinished blocked the
+    // in-map UI cascade (loading screen never hides, map/character/options never render).
+    public PathNodeRealTime()
+    {
+        this.connections = new List<PathNodeRealTime>();
+    }
 
     // Explicit interface implementation — delegate to public method form.
     List<PathNodeRealTime> IPathNode<PathNodeRealTime>.Connections => get_Connections();
