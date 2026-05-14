@@ -321,8 +321,24 @@ public class PlayerCamControl : MonoBehaviour
         }
     }
 
-    // Source: dump.cs RVA 0x18CB3CC — no .ctor.c, default empty ctor.
-    public PlayerCamControl() { }
+    // Source: Ghidra .ctor.c RVA 0x18CB3CC
+    // 1-1 binary:
+    //   CAMZ_DIS         (0x28) = 0xc4834000 → -1050.0f   ← camera offset BEHIND player along Z
+    //   _ShakeFrequency  (0x48) = 0x42700000 → 60.0f
+    //   _ShakePos        (0x3c) = Vector3.zero  (same as default)
+    //   _ShakeResult     (0x50) = Vector3.zero  (same as default)
+    //   base() — MonoBehaviour.ctor.
+    //
+    // Bytes verified via Python read of libil2cpp.so .ctor body.
+    // Previously empty ctor → CAMZ_DIS stayed at C# default 0 → camera at same Z as
+    // player, looking forward at 12.2° tilt → player below screen (viewport Y=-3.71,
+    // out of [0,1]). With CAMZ_DIS = -1050, camera shifts back 1050 units → player
+    // appears in front of camera within frustum.
+    public PlayerCamControl()
+    {
+        CAMZ_DIS = -1050.0f;
+        _ShakeFrequency = 60.0f;
+    }
 
     // Source: Ghidra .cctor.c  RVA 0x18CB454
     // CAM_HEIGHT = 282.0f (0x438D0000 IEEE-float).
