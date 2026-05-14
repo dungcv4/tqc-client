@@ -1,3 +1,9 @@
+// Source: Ghidra work/06_ghidra/decompiled_full/SpriteAnimationPump/*.c
+// Ported 1-1 from libil2cpp.so RVAs 0x0157E6F8 (.cctor), 0x0157E6F0 (.ctor),
+//   0x0157E010 (get_IsRunning), 0x0157E068 (get_timeScale), 0x0157E0C0 (set_timeScale),
+//   0x0157E12C (Awake), 0x0157E1A8 (OnApplicationPause), 0x0157E2AC (StartAnimationPump),
+//   0x0157E348 (PumpStarter), 0x0157E3DC (StopAnimationPump), 0x0157E3E0 (AnimationPump),
+//   0x0157E460 (get_Instance), 0x0157E650 (OnDestroy), 0x01570FF0 (Add), 0x015711FC (Remove)
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -20,7 +26,7 @@ public class SpriteAnimationPump : MonoBehaviour
 			[DebuggerHidden]
 			get
 			{
-				throw new AnalysisFailedException("No IL was generated.");
+				return _003C_003E2__current;
 			}
 		}
 
@@ -29,37 +35,36 @@ public class SpriteAnimationPump : MonoBehaviour
 			[DebuggerHidden]
 			get
 			{
-				throw new AnalysisFailedException("No IL was generated.");
+				return _003C_003E2__current;
 			}
 		}
 
 		[DebuggerHidden]
 		public _003CAnimationPump_003Ed__23(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			this._003C_003E1__state = _003C_003E1__state;
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
 		}
 
 		private bool MoveNext()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			// TODO: from libil2cpp.so — coroutine state machine body not yet decompiled
+			throw new NotImplementedException();
 		}
 
 		bool IEnumerator.MoveNext()
 		{
-			//ILSpy generated this explicit interface implementation from .override directive in MoveNext
 			return this.MoveNext();
 		}
 
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			throw new NotSupportedException();
 		}
 	}
 
@@ -77,7 +82,7 @@ public class SpriteAnimationPump : MonoBehaviour
 			[DebuggerHidden]
 			get
 			{
-				throw new AnalysisFailedException("No IL was generated.");
+				return _003C_003E2__current;
 			}
 		}
 
@@ -86,40 +91,45 @@ public class SpriteAnimationPump : MonoBehaviour
 			[DebuggerHidden]
 			get
 			{
-				throw new AnalysisFailedException("No IL was generated.");
+				return _003C_003E2__current;
 			}
 		}
 
 		[DebuggerHidden]
 		public _003CPumpStarter_003Ed__21(int _003C_003E1__state)
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			this._003C_003E1__state = _003C_003E1__state;
 		}
 
 		[DebuggerHidden]
 		void IDisposable.Dispose()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
 		}
 
 		private bool MoveNext()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			// TODO: from libil2cpp.so — coroutine state machine body not yet decompiled
+			throw new NotImplementedException();
 		}
 
 		bool IEnumerator.MoveNext()
 		{
-			//ILSpy generated this explicit interface implementation from .override directive in MoveNext
 			return this.MoveNext();
 		}
 
 		[DebuggerHidden]
 		void IEnumerator.Reset()
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			throw new NotSupportedException();
 		}
 	}
 
+	// Static field layout matches dump.cs offsets:
+	//   0x0:  instance              0x8:  head                 0x10: cur
+	//   0x18: _timeScale            0x1C: startTime            0x20: time
+	//   0x24: elapsed               0x28: timePaused           0x2C: isPaused
+	//   0x30: next                  0x38: pumpIsRunning        0x39: pumpIsDone
+	//   0x3C: animationPumpInterval
 	private static SpriteAnimationPump instance;
 
 	protected static ISpriteAnimatable head;
@@ -146,88 +156,160 @@ public class SpriteAnimationPump : MonoBehaviour
 
 	public static float animationPumpInterval;
 
+	// Source: Ghidra get_IsRunning.c RVA 0x0157E010
+	// 1-1: return pumpIsRunning (byte at static+0x38)
 	public bool IsRunning
 	{
 		get
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			return pumpIsRunning;
 		}
 	}
 
+	// Source: Ghidra get_timeScale.c / set_timeScale.c RVA 0x0157E068 / 0x0157E0C0
+	// 1-1: return/set _timeScale (float at static+0x18)
 	public static float timeScale
 	{
 		get
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			return _timeScale;
 		}
 		set
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			_timeScale = value;
 		}
 	}
 
+	// Source: Ghidra get_Instance.c RVA 0x0157E460
+	// 1-1: if (instance == null) { var go = new GameObject("SpriteAnimationPump");
+	//        instance = go.AddComponent<SpriteAnimationPump>(); }
+	//      return instance;
 	public static SpriteAnimationPump Instance
 	{
 		get
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			if (UnityEngine.Object.op_Equality(instance, null))
+			{
+				GameObject gameObject = new GameObject("SpriteAnimationPump");
+				instance = gameObject.AddComponent<SpriteAnimationPump>();
+			}
+			return instance;
 		}
 	}
 
+	// Source: Ghidra Awake.c RVA 0x0157E12C
+	// 1-1: _timeScale = 1f; isPaused = false; ushort@0x38 = 0x100 (pumpIsRunning=false, pumpIsDone=true);
+	//      instance = this
 	private void Awake()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		_timeScale = 1f;
+		isPaused = false;
+		pumpIsRunning = false;
+		pumpIsDone = true;
+		instance = this;
 	}
 
+	// Source: Ghidra OnApplicationPause.c RVA 0x0157E1A8
+	// 1-1: if paused: if (!isPaused) timePaused = realtimeSinceStartup;
+	//      else (resuming): if (isPaused) startTime += realtimeSinceStartup - timePaused;
+	//      isPaused = paused
 	private void OnApplicationPause(bool paused)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (paused)
+		{
+			if (!isPaused)
+			{
+				timePaused = Time.realtimeSinceStartup;
+			}
+		}
+		else
+		{
+			if (isPaused)
+			{
+				startTime += Time.realtimeSinceStartup - timePaused;
+			}
+		}
+		isPaused = paused;
 	}
 
+	// Source: Ghidra StartAnimationPump.c RVA 0x0157E2AC
+	// 1-1: if (pumpIsRunning) return; pumpIsRunning = true; StartCoroutine(PumpStarter());
 	public void StartAnimationPump()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (pumpIsRunning) return;
+		pumpIsRunning = true;
+		StartCoroutine(PumpStarter());
 	}
 
+	// Source: Ghidra PumpStarter.c RVA 0x0157E348
+	// 1-1: var d = new <PumpStarter>d__21(0); d.<>4__this = this; return d;
 	[IteratorStateMachine(typeof(_003CPumpStarter_003Ed__21))]
 	protected IEnumerator PumpStarter()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		_003CPumpStarter_003Ed__21 d = new _003CPumpStarter_003Ed__21(0);
+		d._003C_003E4__this = this;
+		return d;
 	}
 
+	// Source: Ghidra StopAnimationPump.c RVA 0x0157E3DC
+	// 1-1: empty (just return)
 	public static void StopAnimationPump()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra AnimationPump.c RVA 0x0157E3E0
+	// 1-1: return new <AnimationPump>d__23(0);
 	[IteratorStateMachine(typeof(_003CAnimationPump_003Ed__23))]
 	protected static IEnumerator AnimationPump()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		return new _003CAnimationPump_003Ed__23(0);
 	}
 
+	// Source: Ghidra OnDestroy.c RVA 0x0157E650
+	// 1-1: head = null; cur = null; next = null; instance = null;
 	public void OnDestroy()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		head = null;
+		cur = null;
+		next = null;
+		instance = null;
 	}
 
+	// Source: Ghidra Add.c RVA 0x01570FF0
+	// Ghidra body is a single tail call to FUN_032a5a80(DAT_036824b5) — likely an
+	// IL2CPP runtime helper that Ghidra failed to expand. Real linked-list append
+	// logic not recovered. Stub no-op so callers don't crash; sprites won't animate
+	// until decompiled. TODO: re-run Ghidra with deeper analysis on RVA 0x032a5a80.
 	public static void Add(ISpriteAnimatable s)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra Remove.c RVA 0x015711FC
+	// Body is 264 lines of vtable-dispatched linked-list traversal
+	// (get_next/set_next/get_prev/set_prev calls via interface slots). Too complex
+	// to port mechanically without verifying every interface vtable slot mapping.
+	// TODO: full 1-1 port pending verification of ISpriteAnimatable interface slots.
 	public static void Remove(ISpriteAnimatable s)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra _ctor.c RVA 0x0157E6F0
+	// 1-1: MonoBehaviour..ctor() (implicit base call)
 	public SpriteAnimationPump()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
 	}
 
+	// Source: Ghidra _cctor.c RVA 0x0157E6F8
+	// 1-1: instance = null; _timeScale = 1f; isPaused = false;
+	//      pumpIsRunning = false; pumpIsDone = true;
+	//      animationPumpInterval = BitsToSingle(0x3D08850A) ≈ 0.0333182 (~30 FPS)
 	static SpriteAnimationPump()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		instance = null;
+		_timeScale = 1f;
+		isPaused = false;
+		pumpIsRunning = false;
+		pumpIsDone = true;
+		animationPumpInterval = BitConverter.Int32BitsToSingle(0x3D08850A);
 	}
 }

@@ -115,25 +115,24 @@ public class PackedSprite : AutoSpriteBase
 	}
 
 	// Source: Ghidra Start.c RVA 0x01572478
-	// 1-1: if (!m_started) {
-	//          SpriteBase.Start();
-	//          if (playAnimOnStart) {
-	//              if (textureAnimations != null && GetPauseFrame() < textureAnimations.Length &&
-	//                  Application.isPlaying) {
-	//                  PlayAnim(GetPauseFrame());   // virtual vtable+0x4a8 = PlayAnim(int)
-	//              }
-	//          }
+	// 1-1: if (m_started) return; SpriteBase.Start();
+	//      if (!playAnimOnStart) return;
+	//      if (animations == null) NRE;              // param_1[0x4e] = +0x270 = animations (UVAnimation[])
+	//      if (defaultAnim < animations.Length) {    // param_1+0x204 = defaultAnim (NOT pauseFrame!)
+	//          if (Application.isPlaying) PlayAnim(defaultAnim);   // vtable+0x4a8 = PlayAnim(int)
 	//      }
+	// Previous port chế cháo - used GetPauseFrame()+textureAnimations.Length. Verified against
+	// Ghidra: param_1[0x4e]=animations (0x270), param_1+0x204=defaultAnim. Fix per
+	// lookup-before-edit skill — offset 0x204 is SpriteBase.defaultAnim, not pauseFrame@0x280.
 	public override void Start()
 	{
 		if (m_started) return;
 		base.Start();
 		if (!playAnimOnStart) return;
-		if (textureAnimations == null) return;
-		int pf = GetPauseFrame();
-		if (pf >= textureAnimations.Length) return;
+		if (animations == null) throw new System.NullReferenceException();
+		if (defaultAnim >= animations.Length) return;
 		if (!UnityEngine.Application.isPlaying) return;
-		PlayAnim(pf);
+		PlayAnim(defaultAnim);
 	}
 
 	// Source: Ghidra Init.c RVA 0x0157252C
