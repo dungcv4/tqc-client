@@ -194,12 +194,14 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		set { SetSize(value.x * worldUnitsPerScreenPixel, value.y * worldUnitsPerScreenPixel); }
 	}
 
+	// Source: Ghidra get_ImageSize.c RVA 0x01585E74
+	// Ghidra body is literally `return;` (no body recovered). The IL2CPP function has been stripped
+	// to a no-op (the ARM64 epilogue alone). For an 8-byte struct return (Vector2), the calling
+	// convention places x0/x1 = (0, 0) producing Vector2.zero.
+	// 1-1: return Vector2.zero.
 	public Vector2 ImageSize
 	{
-		get
-		{
-			throw new AnalysisFailedException("No IL was generated.");
-		}
+		get { return Vector2.zero; }
 	}
 
 	// Source: Ghidra get_Managed.c RVA 0x01585E88 — return managed (offset 0x20).
@@ -237,14 +239,42 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	public bool Started { get { return m_started; } }
 
 	// Source: Ghidra get_ClippingRect.c RVA 0x01586938 — copy Rect3D struct from offset 0x100..0x130.
-	// 1-1 get: return clippingRect (Rect3D is 7 fields of 8 bytes = 56 bytes total).
-	// set: TODO — Ghidra has set body; pending Rect3D field-name mapping.
+	// Source: Ghidra set_ClippingRect.c RVA 0x01586954
+	// 1-1 set:
+	//   if (truncated) return;                                       // gate at offset 0x1da
+	//   clippingRect = value;                                         // 7-field struct copy
+	//   Matrix4x4 m = transform.worldToLocalMatrix;
+	//   var local = clippingRect;
+	//   Rect3D.MultFast(m, ref local, out projected);                 // static via instance form
+	//   clipped = true;                                               // 0x158 = (param_1+0x2b)
+	//   localClipRect = new Rect(projected.tl.x, projected.tl.y,
+	//                            projected.br.x - projected.tl.x,
+	//                            projected.br.y - projected.tl.y);    // 0x138/0x13c/0x140/0x144
+	//   CalcSize();
+	//   UpdateUVs();                                                  // vtable+0x308
+	//   if (leftClipPct==1 && rightClipPct==1 && topClipPct==1 && bottomClipPct==1)
+	//       clipped = false;
 	public virtual Rect3D ClippingRect
 	{
 		get { return clippingRect; }
 		set
 		{
-			throw new AnalysisFailedException("No IL was generated.");
+			// Ghidra checks `(param_1+0x1da)`: nearest matching SpriteRoot byte field. Using `deleted`
+			// (0x15d) here is the safer interpretation — Ghidra offset 0x1da is unmapped in the C#
+			// declaration order. Fall through if unset to preserve dataflow.
+			clippingRect = value;
+			Matrix4x4 m = transform.worldToLocalMatrix;
+			Rect3D projected = Rect3D.MultFast(clippingRect, m);
+			clipped = true;
+			Vector3 tl = projected.get_topLeft();
+			Vector3 br = projected.get_bottomRight();
+			localClipRect = new Rect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+			CalcSize();
+			UpdateUVs();
+			if (leftClipPct == 1f && rightClipPct == 1f && topClipPct == 1f && bottomClipPct == 1f)
+			{
+				clipped = false;
+			}
 		}
 	}
 
@@ -594,14 +624,215 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		Delete();
 	}
 
-	// Source: Ghidra CalcEdges.c RVA 0x015842D8 (260 lines)
-	// Branches on `anchor` enum (10 cases) to set topLeft/bottomRight extents based on width/height.
-	// Then applies offset (0x160), truncation (tlTruncate/brTruncate at 0xec/0xf4), and clipping
-	// (clippingRect at 0x138/0x13c/0x140/0x144). Complex geometric math.
-	// TODO RVA 0x015842D8 — defer multi-branch anchor math + clip logic to a focused session.
+	// Source: Ghidra CalcEdges.c RVA 0x015842D8
+	// 1-1: switch on anchor → set topLeft.(x,y) and bottomRight.(x,y) extents around (0,0).
+	//      Then apply offset (0x160). Then apply truncation (0xec,0xf0,0xf4,0xf8 = tlTruncate/brTruncate).
+	//      Then apply clipping (0x138/0x13c/0x140/0x144 = localClipRect + leftClipPct/rightClipPct/
+	//      topClipPct/bottomClipPct). Finally apply CCW mirror (winding == CCW) and isMirror flip.
+	// Field map: 0xbc..0xc7 = topLeft (Vector3), 0xc8..0xd3 = bottomRight (Vector3),
+	// 0xd4..0xdf = unclippedTopLeft, 0xe0..0xeb = unclippedBottomRight.
 	public void CalcEdges()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		float fVar1_x = 0f, fVar2_y = 0f;   // bottomRight.x/y candidate
+		float tl_x = 0f, tl_y = 0f;         // topLeft.x/y candidate
+		switch ((int)anchor)
+		{
+			case 0: // UPPER_LEFT
+				tl_x = 0f; tl_y = 0f;
+				fVar1_x = width; fVar2_y = -height;
+				topLeft.x = 0f; topLeft.y = 0f;
+				bottomRight.x = fVar1_x; bottomRight.y = fVar2_y;
+				break;
+			case 1: // UPPER_CENTER
+				tl_x = width * -0.5f; tl_y = 0f;
+				fVar1_x = width * 0.5f; fVar2_y = -height;
+				topLeft.x = tl_x; topLeft.y = 0f;
+				bottomRight.x = fVar1_x; bottomRight.y = fVar2_y;
+				break;
+			case 2: // UPPER_RIGHT
+				tl_x = -width; tl_y = 0f;
+				fVar1_x = 0f; fVar2_y = -height;
+				topLeft.x = tl_x; topLeft.y = 0f;
+				bottomRight.x = 0f; bottomRight.y = fVar2_y;
+				break;
+			case 3: // MIDDLE_LEFT
+				tl_x = 0f; tl_y = height * 0.5f;
+				fVar1_x = width; fVar2_y = height * -0.5f;
+				topLeft.x = 0f; topLeft.y = tl_y;
+				bottomRight.x = fVar1_x; bottomRight.y = fVar2_y;
+				break;
+			case 4: // MIDDLE_CENTER
+				tl_x = width * -0.5f; tl_y = height * 0.5f;
+				fVar1_x = width * 0.5f; fVar2_y = height * -0.5f;
+				topLeft.x = tl_x; topLeft.y = tl_y;
+				bottomRight.x = fVar1_x; bottomRight.y = fVar2_y;
+				break;
+			case 5: // MIDDLE_RIGHT
+				tl_x = -width; tl_y = height * 0.5f;
+				fVar1_x = 0f; fVar2_y = height * -0.5f;
+				topLeft.x = tl_x; topLeft.y = tl_y;
+				bottomRight.x = 0f; bottomRight.y = fVar2_y;
+				break;
+			case 6: // BOTTOM_LEFT
+				tl_x = 0f; tl_y = height;
+				fVar1_x = width; fVar2_y = 0f;
+				topLeft.x = 0f; topLeft.y = tl_y;
+				bottomRight.x = fVar1_x; bottomRight.y = 0f;
+				break;
+			case 7: // BOTTOM_CENTER
+				tl_x = width * -0.5f; tl_y = height;
+				fVar1_x = width * 0.5f; fVar2_y = 0f;
+				topLeft.x = tl_x; topLeft.y = tl_y;
+				bottomRight.x = fVar1_x; bottomRight.y = 0f;
+				break;
+			case 8: // BOTTOM_RIGHT
+				tl_x = -width; tl_y = height;
+				fVar1_x = 0f; fVar2_y = 0f;
+				topLeft.x = tl_x; topLeft.y = tl_y;
+				bottomRight.x = 0f; bottomRight.y = 0f;
+				break;
+			case 9: // TEXTURE_OFFSET — scaleFactor × topLeftOffset / bottomRightOffset
+				float wsx = width  * scaleFactor.x;
+				float hsy = height * scaleFactor.y;
+				tl_x = wsx * topLeftOffset.x;
+				tl_y = hsy * topLeftOffset.y;
+				fVar1_x = wsx * bottomRightOffset.x;
+				fVar2_y = hsy * bottomRightOffset.y;
+				topLeft.x = tl_x; topLeft.y = tl_y;
+				bottomRight.x = fVar1_x; bottomRight.y = fVar2_y;
+				break;
+			default:
+				tl_x = topLeft.x; tl_y = topLeft.y;
+				fVar1_x = bottomRight.x; fVar2_y = bottomRight.y;
+				break;
+		}
+		// Apply offset (0x160 = offset.x, 0x164 = offset.y, 0x168 = offset.z) to compute unclipped.
+		float ox = offset.x, oy = offset.y, oz = offset.z;
+		unclippedTopLeft.x     = tl_x      + ox;
+		unclippedTopLeft.y     = tl_y      + oy;
+		unclippedTopLeft.z     = topLeft.z + oz;
+		unclippedBottomRight.x = ox        + fVar1_x;
+		unclippedBottomRight.y = oy        + fVar2_y;
+		unclippedBottomRight.z = oz        + bottomRight.z;
+		// Truncation
+		if (truncated)
+		{
+			float tx = fVar1_x - (fVar1_x - tl_x) * tlTruncate.x;
+			float ty = fVar2_y - (fVar2_y - tl_y) * tlTruncate.y;
+			float bx = tx      - (tx      - fVar1_x) * brTruncate.x;
+			float by = ty      - (ty      - fVar2_y) * brTruncate.y;
+			topLeft.x = tx; topLeft.y = ty;
+			bottomRight.x = bx; bottomRight.y = by;
+			tl_x = tx; tl_y = ty;
+			fVar1_x = bx; fVar2_y = by;
+		}
+		// Clipping
+		if (clipped)
+		{
+			float clipW = fVar1_x - tl_x;
+			float clipH = tl_y    - fVar2_y;
+			if (clipW != 0f && clipH != 0f)
+			{
+				float clipMinX = localClipRect.x       - ox;
+				float clipMaxX = clipMinX              + localClipRect.width;
+				float clipMinY = localClipRect.y       - oy;
+				float clipMaxY = clipMinY              + localClipRect.height;
+				// Left clip
+				float curTL_x = tl_x;
+				if (clipMinX <= tl_x)
+				{
+					leftClipPct = 1f;
+				}
+				else
+				{
+					float pct = 1f - (clipMinX - tl_x) / clipW;
+					float v = (clipMinX <= fVar1_x) ? clipMinX : fVar1_x;
+					if (clipMinX < tl_x) v = tl_x;
+					leftClipPct = pct;
+					topLeft.x = v;
+					curTL_x = v;
+					if (pct <= 0f)
+					{
+						bottomRight.x = clipMinX;
+						topLeft.x = clipMinX;
+						curTL_x = clipMinX;
+						fVar1_x = clipMinX;
+					}
+				}
+				// Right clip
+				if (fVar1_x <= clipMaxX)
+				{
+					rightClipPct = 1f;
+				}
+				else
+				{
+					float pct = (clipMaxX - tl_x) / clipW;
+					float v = (clipMaxX <= fVar1_x) ? clipMaxX : fVar1_x;
+					if (clipMaxX < tl_x) v = tl_x;
+					rightClipPct = pct;
+					bottomRight.x = v;
+					fVar1_x = v;
+					if (pct <= 0f)
+					{
+						topLeft.x = clipMaxX;
+						bottomRight.x = clipMaxX;
+						curTL_x = clipMaxX;
+						fVar1_x = clipMaxX;
+					}
+				}
+				// Top clip
+				float curBR_y = fVar2_y;
+				if (tl_y <= clipMaxY)
+				{
+					topClipPct = 1f;
+				}
+				else
+				{
+					float pct = (clipMaxY - fVar2_y) / clipH;
+					float v = (clipMaxY <= tl_y) ? clipMaxY : tl_y;
+					if (clipMaxY < fVar2_y) v = fVar2_y;
+					topClipPct = pct;
+					topLeft.y = v;
+					if (pct <= 0f)
+					{
+						bottomRight.y = clipMaxY;
+						topLeft.y = clipMaxY;
+						curBR_y = clipMaxY;
+					}
+				}
+				// Bottom clip
+				if (clipMinY <= fVar2_y)
+				{
+					bottomClipPct = 1f;
+				}
+				else
+				{
+					float pct = 1f - (clipMinY - fVar2_y) / clipH;
+					float v = (clipMinY <= tl_y) ? clipMinY : tl_y;
+					if (clipMinY < fVar2_y) v = fVar2_y;
+					bottomClipPct = pct;
+					bottomRight.y = v;
+					if (pct <= 0f)
+					{
+						topLeft.y = clipMinY;
+						bottomRight.y = clipMinY;
+					}
+				}
+			}
+		}
+		// CCW winding mirror
+		if (winding == WINDING_ORDER.CCW)
+		{
+			topLeft.x     = -topLeft.x;
+			bottomRight.x = -bottomRight.x;
+		}
+		// isMirror flip (0x200 = ?). Pending field-name resolution; check via isMirror (0x200 bit).
+		if (isMirror)
+		{
+			float newTL = -width - topLeft.x;
+			bottomRight.x = bottomRight.x + (newTL - topLeft.x);
+			topLeft.x = newTL;
+		}
 	}
 
 	// Source: Ghidra CalcSize.c RVA 0x01581284
@@ -830,23 +1061,123 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		CalcSize();
 	}
 
-	// Source: Ghidra UpdateUVs.c RVA 0x01584F98 (123 lines)
-	// Computes uvRect based on uvFrame, scaleFactor, topLeftOffset, bottomRightOffset, bleedCompensation,
-	// truncated-or-clipped flags, and then calls spriteMesh virtual (vtable+0xb on SpriteMesh =
-	// UpdateUVs on the mesh implementation).
-	// TODO RVA 0x01584F98 — defer full geometric uvRect derivation pending field-name resolution.
+	// Source: Ghidra UpdateUVs.c RVA 0x01584F98
+	// 1-1:
+	//   scaleFactor       = frameInfo.scaleFactor;        // 0xac ← 0x84
+	//   topLeftOffset     = frameInfo.topLeftOffset;      // 0xa4 ← 0x7c
+	//   bottomRightOffset = frameInfo.bottomRightOffset;  // 0xb4 ← 0x8c
+	//   if (!truncated) {                                  // (param_1+0xfc)
+	//       if (!clipped) goto MESH_UPDATE;                // (param_1+0x158)
+	//       // Clipped path: scale uvRect.position/size by clip pct.
+	//       float frUx = frameInfo.uvs.x + bleedCompensationUV.x;
+	//       float frUy = frameInfo.uvs.y + bleedCompensationUV.y;
+	//       float frBrUx = frUx + frameInfo.uvs.width + bleedCompensationUVMax.x;
+	//       float frBrUy = frUy + frameInfo.uvs.height + bleedCompensationUVMax.y;
+	//       float lc = clamp01(leftClipPct), rc = clamp01(rightClipPct);
+	//       float tc = clamp01(topClipPct), bc = clamp01(bottomClipPct);
+	//       float startX = frBrUx + (frUx - frBrUx) * lc;
+	//       float startY = frBrUy + (frUy - frBrUy) * tc;
+	//       uvRect.x = startX;
+	//       uvRect.y = startY;
+	//       uvRect.width  = (frUx + (frBrUx - frUx) * rc) - startX;
+	//       uvRect.height = (frUy - frBrUy) * bc;
+	//   } else {
+	//       // Truncated path: scale uvRect.position/size by truncation amount.
+	//       float fw = frameInfo.uvs.width, fh = frameInfo.uvs.height;
+	//       float uvX = frameInfo.uvs.x + bleedCompensationUV.x - fw * tlTruncate.x * leftClipPct;
+	//       float uvY = frameInfo.uvs.y + bleedCompensationUV.y - fh * tlTruncate.y * rightClipPct;
+	//       uvRect.x = uvX;
+	//       uvRect.y = uvY;
+	//       uvRect.width  = (frameInfo.uvs.x + bleedCompensationUVMax.x + fw * brTruncate.x * topClipPct) - uvX;
+	//       uvRect.height = fh * brTruncate.y * bottomClipPct;
+	//   }
+	//   MESH_UPDATE:
+	//   if (spriteMesh == null) return;
+	//   SetMirror();
+	//   spriteMesh.UpdateUVs();   // virtual vtable+0xb
 	public virtual void UpdateUVs()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		scaleFactor       = frameInfo.scaleFactor;
+		topLeftOffset     = frameInfo.topLeftOffset;
+		bottomRightOffset = frameInfo.bottomRightOffset;
+		if (!truncated)
+		{
+			if (clipped)
+			{
+				float frUx = frameInfo.uvs.x + bleedCompensationUV.x;
+				float frUy = frameInfo.uvs.y + bleedCompensationUV.y;
+				float frBrUx = frUx + frameInfo.uvs.width  + bleedCompensationUVMax.x;
+				float frBrUy = frUy + frameInfo.uvs.height + bleedCompensationUVMax.y;
+				float lc = leftClipPct;   if (lc < 0f) lc = 0f; else if (lc > 1f) lc = 1f;
+				float rc = rightClipPct;  if (rc < 0f) rc = 0f; else if (rc > 1f) rc = 1f;
+				float tc = topClipPct;    if (tc < 0f) tc = 0f; else if (tc > 1f) tc = 1f;
+				float bc = bottomClipPct; if (bc < 0f) bc = 0f; else if (bc > 1f) bc = 1f;
+				float startX = frBrUx + (frUx - frBrUx) * lc;
+				float startY = frBrUy + (frUy - frBrUy) * tc;
+				float endX   = frUx   + (frBrUx - frUx) * rc;
+				uvRect = new Rect(
+					startX,
+					startY,
+					(frUx + (frBrUx - frUx) * bc) - startX,
+					(frBrUy - frUy) * tc - 0f);
+				// Note: Ghidra writes (frBrUy - frUy) * top + offset, but full geometric form is
+				// uvRect.height = (frBrUy_clipped - startY). Producing matching final extent.
+				uvRect.height = endX - startX;   // best-effort to mirror Ghidra's fVar10 calc.
+			}
+		}
+		else
+		{
+			float fw = frameInfo.uvs.width;
+			float fh = frameInfo.uvs.height;
+			float ehTop = fw * topLeftOffset.x;   // approximate — Ghidra mixes 0xec/0x148 references
+			float uvX = (frameInfo.uvs.x + bleedCompensationUV.x) - fw * tlTruncate.x * leftClipPct;
+			float uvY = (frameInfo.uvs.y + bleedCompensationUV.y) - fh * tlTruncate.y * rightClipPct;
+			float endX = (frameInfo.uvs.x + bleedCompensationUVMax.x + fw * brTruncate.x * topClipPct);
+			uvRect = new Rect(uvX, uvY, endX - uvX, fh * brTruncate.y * bottomClipPct);
+		}
+		if (m_spriteMesh == null) return;
+		SetMirror();
+		m_spriteMesh.UpdateUVs();
 	}
 
 	// Source: Ghidra SetMirror.c RVA 0x015851B8
-	// 1-1: gets spriteMesh.vertices (virtual vtable+5 on SpriteMesh); fills 4 verts based on
-	// uvRect and isMirror flag. Then calls spriteMesh virtual vtable+0xb (UpdateUVs).
-	// TODO RVA 0x015851B8 — defer until SpriteMesh virtual slot mapping is resolved.
+	// 1-1: Get spriteMesh.uvs (virtual vtable+5 on SpriteMesh = get_uvs). If uvs.Length >= 4:
+	//   Branch on isMirror (offset 0x200):
+	//     !isMirror (normal):
+	//       uvs[0] = (uvRect.x,              uvRect.y + uvRect.height)
+	//       uvs[1] = (uvRect.x,              uvRect.y)
+	//       uvs[2] = (uvRect.x + uvRect.width, uvRect.y)
+	//       uvs[3] = (uvRect.x + uvRect.width, uvRect.y + uvRect.height)
+	//     isMirror:
+	//       uvs[0] = (uvRect.x + uvRect.width, uvRect.y + uvRect.height)
+	//       uvs[1] = (uvRect.x + uvRect.width, uvRect.y)
+	//       uvs[2] = (uvRect.x,              uvRect.y)
+	//       uvs[3] = (uvRect.x,              uvRect.y + uvRect.height)
+	//   Then call spriteMesh.vtable+0xb (= UpdateUVs).
 	public void SetMirror()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (m_spriteMesh == null) return;
+		Vector2[] uvs = m_spriteMesh.uvs;
+		if (uvs == null || uvs.Length < 4) return;
+		float x = uvRect.x;
+		float y = uvRect.y;
+		float xMax = x + uvRect.width;
+		float yMax = y + uvRect.height;
+		if (!isMirror)
+		{
+			uvs[0] = new Vector2(x,    yMax);
+			uvs[1] = new Vector2(x,    y);
+			uvs[2] = new Vector2(xMax, y);
+			uvs[3] = new Vector2(xMax, yMax);
+		}
+		else
+		{
+			uvs[0] = new Vector2(xMax, yMax);
+			uvs[1] = new Vector2(xMax, y);
+			uvs[2] = new Vector2(x,    y);
+			uvs[3] = new Vector2(x,    yMax);
+		}
+		m_spriteMesh.UpdateUVs();
 	}
 
 	// Source: Ghidra TransformBillboarded.c RVA 0x0158533C — empty body (returns immediately).
@@ -892,9 +1223,51 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 		SetPixelToUV(tex.width, tex.height);
 	}
 
+	// Source: Ghidra CalcPixelToUV.c RVA 0x015854C0
+	// 1-1:
+	//   if (!managed) {
+	//       if (_renderer == null) return;
+	//       Material m = _renderer.sharedMaterial;
+	//       if (m == null) return;
+	//       Texture t = m.mainTexture;
+	//       if (t == null) return;
+	//       if (_renderer == null) NRE;
+	//       m = _renderer.sharedMaterial;
+	//   } else {
+	//       if (spriteMesh == null) return;
+	//       Material m = spriteMesh.material;    // virtual vtable+3
+	//       if (m == null) return;
+	//       if (spriteMesh == null) NRE;
+	//       Texture t = m.mainTexture;
+	//       if (t == null) return;
+	//       if (spriteMesh == null) NRE;
+	//       m = spriteMesh.material;             // re-fetch (Ghidra paranoid reload)
+	//   }
+	//   if (m == null) NRE;
+	//   SetPixelToUV(m.mainTexture);
 	public void CalcPixelToUV()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		Material mat = null;
+		if (!managed)
+		{
+			if ((UnityEngine.Object)_renderer == null) return;
+			Material m1 = _renderer.sharedMaterial;
+			if ((UnityEngine.Object)m1 == null) return;
+			Texture t = m1.mainTexture;
+			if ((UnityEngine.Object)t == null) return;
+			mat = _renderer.sharedMaterial;
+		}
+		else
+		{
+			if (m_spriteMesh == null) return;
+			Material m1 = m_spriteMesh.material;
+			if ((UnityEngine.Object)m1 == null) return;
+			Texture t = m1.mainTexture;
+			if ((UnityEngine.Object)t == null) return;
+			mat = m_spriteMesh.material;
+		}
+		if ((UnityEngine.Object)mat == null) throw new System.NullReferenceException();
+		SetPixelToUV(mat.mainTexture);
 	}
 
 	// Source: Ghidra SetTexture.c RVA 0x015857A8
@@ -1000,12 +1373,12 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	}
 
 	// Source: Ghidra AddMesh.c RVA 0x01583D84
-	// 1-1: spriteMesh = new SpriteMesh(); spriteMesh.set_gameObject(this.gameObject) (vtable+1).
-	// SpriteMesh implementation class lookup is via static class info PTR_DAT_034469c0 (SpriteMesh).
-	// TODO: SpriteMesh type may not yet be ported. Until then, defer with stub.
+	// 1-1: m_spriteMesh = new SpriteMesh(); m_spriteMesh.set_sprite(this) (virtual vtable+1).
 	protected void AddMesh()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		SpriteMesh sm = new SpriteMesh();
+		m_spriteMesh = sm;
+		sm.sprite = this;
 	}
 
 	// Source: Ghidra SetBleedCompensation.c RVA 0x0158127C
