@@ -664,31 +664,330 @@ public class SpriteManagerPool : MonoBehaviour
 		return (PackedSprite)spriteRoot;
 	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/createSpriteUI.c RVA 0x18E4548
+	// 1-1: like createSprite but trimmed — no color/shader/hash logic; caches the SM into the
+	// ref-parameter `sMgrInst` instead of into _smPoolInst. Used for UI sprites whose appearance
+	// is fully driven by the prefab (no per-instance recolor).
+	//   if (!IsSpriteReady(spriteName)) return null;
+	//   sMgrInst = null;
+	//   if (_smPool.ContainsKey(spriteName)) {
+	//       prefabSM = _smPool[spriteName];
+	//       if (prefabSM != null) {
+	//           inst = Instantiate(prefabSM, this.transform);
+	//           sMgrInst = inst.GetComponent<SpriteManager>();
+	//       }
+	//   }
+	//   spritePF = _spritePFPool.ContainsKey(spriteName) ? _spritePFPool[spriteName] : null;
+	//   if (sMgrInst == null || spritePF == null) {
+	//       UJDebug.Log(lit 10427 "SpriteManager or SpritePrefab is null...createSprite failed...");
+	//       return null;
+	//   }
+	//   return (PackedSprite)sMgrInst.CreateSprite(spritePF);
 	public PackedSprite createSpriteUI(string spriteName, ref SpriteManager sMgrInst)
-	{ return default; }
+	{
+		if (!IsSpriteReady(spriteName)) return null;
+		sMgrInst = null;
+		if (_smPool == null) throw new System.NullReferenceException();
+		if (_smPool.ContainsKey(spriteName))
+		{
+			UnityEngine.GameObject prefabSM = _smPool[spriteName];
+			if ((UnityEngine.Object)prefabSM != null)
+			{
+				UnityEngine.GameObject host = base.gameObject;
+				if ((UnityEngine.Object)host == null) throw new System.NullReferenceException();
+				UnityEngine.GameObject inst = UnityEngine.Object.Instantiate(prefabSM, host.transform);
+				if ((UnityEngine.Object)inst == null) throw new System.NullReferenceException();
+				sMgrInst = inst.GetComponent<SpriteManager>();
+			}
+		}
+		if (_spritePFPool == null) throw new System.NullReferenceException();
+		UnityEngine.GameObject spritePF = null;
+		if (_spritePFPool.ContainsKey(spriteName))
+		{
+			spritePF = _spritePFPool[spriteName];
+		}
+		if ((UnityEngine.Object)sMgrInst == null || (UnityEngine.Object)spritePF == null)
+		{
+			UJDebug.Log("SpriteManager or SpritePrefab is null...createSprite failed...");
+			return null;
+		}
+		SpriteRoot sr = sMgrInst.CreateSprite(spritePF);
+		if (sr == null) return null;
+		return (PackedSprite)sr;
+	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/removeSprite.c RVA 0x18D6E08
+	// 1-1: if (spriteRoot == null) return;
+	//      sm = spriteRoot.manager;                              // SpriteRoot field @ 0x28
+	//      if (sm == null) return;
+	//      SpriteManager.RemoveSprite(sm, spriteRoot);
 	public void removeSprite(SpriteRoot spriteRoot)
-	{ }
+	{
+		if ((UnityEngine.Object)spriteRoot == null) return;
+		SpriteManager sm = spriteRoot.manager;
+		if ((UnityEngine.Object)sm == null) return;
+		sm.RemoveSprite(spriteRoot);
+	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/checkShadow.c RVA 0x18E3E3C
+	// 1-1 mapping:
+	//   if (shadowManager (static @ +8) == null) {
+	//       GameObject prefab = Resources.Load("Prefabs/model/shadow");      // lit 9185
+	//       if (prefab != null) {
+	//           Camera mainCam = Camera.main;
+	//           if (mainCam != null) {
+	//               Transform p = mainCam.gameObject.transform;
+	//               GameObject inst = Instantiate(prefab, p);
+	//               shadowManager = (inst != null && inst is GameObject) ? inst : null;
+	//               if (shadowManager != null) {
+	//                   SpriteManager smComp = shadowManager.GetComponent<SpriteManager>();
+	//                   if (smComp != null) {
+	//                       Renderer rnd = smComp.GetComponent<Renderer>();
+	//                       if (rnd != null && rnd.material != null) rnd.sortingOrder = 1;
+	//                   }
+	//                   shadowManager.layer = LayerMask.NameToLayer("background");  // lit 15214
+	//               }
+	//           }
+	//       }
+	//   }
+	//   if (shadowPrefab (static @ +0x10) == null) {
+	//       shadowPrefab = Resources.Load("Prefabs/model/ShadowManager") as GameObject;  // lit 9186
+	//   }
+	// (lit 9185 "Prefabs/model/shadow" → shadowManager instance template,
+	//  lit 9186 "Prefabs/model/ShadowManager" → shadowPrefab cache)
+	// NOTE: Ghidra reads PTR_StringLiteral_9185 for the FIRST Resources.Load (the manager
+	// instance) and PTR_StringLiteral_9186 for the SECOND (the prefab cache); the names are
+	// swapped relative to the field names so I follow Ghidra exactly.
 	private void checkShadow()
-	{ }
+	{
+		if ((UnityEngine.Object)shadowManager == null)
+		{
+			UnityEngine.GameObject prefab = UnityEngine.Resources.Load("Prefabs/model/shadow") as UnityEngine.GameObject;
+			if ((UnityEngine.Object)prefab != null)
+			{
+				UnityEngine.Camera mainCam = UnityEngine.Camera.main;
+				if ((UnityEngine.Object)mainCam != null)
+				{
+					UnityEngine.GameObject camGo = mainCam.gameObject;
+					if ((UnityEngine.Object)camGo != null)
+					{
+						UnityEngine.Transform parent = camGo.transform;
+						UnityEngine.GameObject inst = UnityEngine.Object.Instantiate(prefab, parent) as UnityEngine.GameObject;
+						shadowManager = inst;
+						if ((UnityEngine.Object)shadowManager != null)
+						{
+							SpriteManager smComp = shadowManager.GetComponent<SpriteManager>();
+							if ((UnityEngine.Object)smComp != null)
+							{
+								UnityEngine.Renderer rnd = smComp.GetComponent<UnityEngine.Renderer>();
+								if ((UnityEngine.Object)rnd != null && (UnityEngine.Object)rnd.material != null)
+								{
+									rnd.sortingOrder = 1;
+								}
+							}
+							shadowManager.layer = UnityEngine.LayerMask.NameToLayer("background");
+						}
+					}
+				}
+			}
+		}
+		if ((UnityEngine.Object)shadowPrefab == null)
+		{
+			shadowPrefab = UnityEngine.Resources.Load("Prefabs/model/ShadowManager") as UnityEngine.GameObject;
+		}
+	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/getShadow.c RVA 0x18DAB50
+	// 1-1:
+	//   if (shadowManager == null || shadowPrefab == null) checkShadow();
+	//   if (shadowManager == null || shadowPrefab == null) return null;
+	//   sm = shadowManager.GetComponent<SpriteManager>();
+	//   pos = shadowPrefab.transform.localPosition;
+	//   rot = shadowPrefab.transform.localRotation;
+	//   return (PackedSprite)SpriteManager.CreateSprite(sm, shadowPrefab, pos, rot);
 	public PackedSprite getShadow()
-	{ return default; }
+	{
+		if ((UnityEngine.Object)shadowManager == null || (UnityEngine.Object)shadowPrefab == null)
+		{
+			checkShadow();
+		}
+		if ((UnityEngine.Object)shadowManager == null) return null;
+		if ((UnityEngine.Object)shadowPrefab == null) return null;
+		SpriteManager sm = shadowManager.GetComponent<SpriteManager>();
+		if ((UnityEngine.Object)sm == null) throw new System.NullReferenceException();
+		UnityEngine.Transform t = shadowPrefab.transform;
+		if ((UnityEngine.Object)t == null) throw new System.NullReferenceException();
+		UnityEngine.Vector3 pos = t.localPosition;
+		UnityEngine.Quaternion rot = t.localRotation;
+		SpriteRoot sr = sm.CreateSprite(shadowPrefab, pos, rot);
+		if (sr == null) return null;
+		return (PackedSprite)sr;
+	}
 
-	[IteratorStateMachine(typeof(_003CgetShadowSpriteMgr_003Ed__31))]
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/getShadowSpriteMgr.c RVA 0x18E4808
+	// + state-machine MoveNext (work/06_ghidra/.../SpriteManagerPool/getShadowSpriteMgr_MoveNext.c)
+	// Mirrors getSpriteMgr but stores into _shadowSpriteManagerPool (0x50) instead of _smPool (0x28).
 	private IEnumerator getShadowSpriteMgr(string spriteName)
-	{ return default; }
+	{
+		if (_shadowSpriteManagerPool == null || _shadowSpriteManagerWaitLoading == null)
+			throw new System.NullReferenceException();
+		if (_shadowSpriteManagerPool.ContainsKey(spriteName)) yield break;
+		IUJObjectOperation op = ResourcesLoader.GetObjectTypeAssetDynamic(
+			ResourcesLoader.AssetType.MODEL,
+			spriteName + "_manager",
+			null);
+		float loadTime = 0f;
+		float progress = 0f;
+		while (op != null && !op.isDone)
+		{
+			loadTime += WAITTIME;
+			progress = op.progress;
+			yield return new UnityEngine.WaitForSeconds(WAITTIME);
+		}
+		if (op != null && op.values != null && op.values.Length > 0)
+		{
+			UnityEngine.Object asset = op.values[0];
+			if ((UnityEngine.Object)asset != null)
+			{
+				_shadowSpriteManagerPool[spriteName] = (UnityEngine.GameObject)asset;
+			}
+		}
+		_shadowSpriteManagerWaitLoading[spriteName] = null;
+	}
 
-	[IteratorStateMachine(typeof(_003CgetShadowSpritePrefab_003Ed__32))]
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/getShadowSpritePrefab.c RVA 0x18E48B8
+	// + state-machine MoveNext (work/06_ghidra/.../SpriteManagerPool/getShadowSpritePrefab_MoveNext.c)
+	// Mirrors getSpritePrefab but stores into _shadowSpritePrefabPool (0x68) instead of _spritePFPool (0x40).
 	private IEnumerator getShadowSpritePrefab(string spriteName)
-	{ return default; }
+	{
+		if (_shadowSpritePrefabPool == null || _shadowSpritePrefabWaitLoading == null)
+			throw new System.NullReferenceException();
+		if (_shadowSpritePrefabPool.ContainsKey(spriteName)) yield break;
+		IUJObjectOperation op = ResourcesLoader.GetObjectTypeAssetDynamic(
+			ResourcesLoader.AssetType.MODEL,
+			spriteName,
+			null);
+		float loadTime = 0f;
+		float progress = 0f;
+		while (op != null && !op.isDone)
+		{
+			loadTime += WAITTIME;
+			progress = op.progress;
+			yield return new UnityEngine.WaitForSeconds(WAITTIME);
+		}
+		if (op != null && op.values != null && op.values.Length > 0)
+		{
+			UnityEngine.Object asset = op.values[0];
+			if ((UnityEngine.Object)asset != null)
+			{
+				_shadowSpritePrefabPool[spriteName] = (UnityEngine.GameObject)asset;
+			}
+		}
+		_shadowSpritePrefabWaitLoading[spriteName] = null;
+	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/IsShadowReady.c RVA 0x18E4968
+	// Field-offset mirror of IsSpriteReady, using the shadow-side dictionaries:
+	//   _smPool                 → _shadowSpriteManagerPool       (0x50)
+	//   _spritePFPool           → _shadowSpritePrefabPool        (0x68)
+	//   _smWaitLoading          → _shadowSpriteManagerWaitLoading(0x48)
+	//   _spritePFWaitLoading    → _shadowSpritePrefabWaitLoading (0x60)
 	public bool IsShadowReady(string spriteName)
-	{ return default; }
+	{
+		if (_shadowSpriteManagerPool == null) throw new System.NullReferenceException();
+		if (_shadowSpriteManagerPool.ContainsKey(spriteName))
+		{
+			if (_shadowSpritePrefabPool == null) throw new System.NullReferenceException();
+			if (_shadowSpritePrefabPool.ContainsKey(spriteName)) return true;
+		}
+		if (_shadowSpriteManagerWaitLoading == null) throw new System.NullReferenceException();
+		if (!_shadowSpriteManagerWaitLoading.ContainsKey(spriteName))
+		{
+			UnityEngine.Coroutine c = StartCoroutine(getShadowSpriteMgr(spriteName));
+			_shadowSpriteManagerWaitLoading[spriteName] = c;
+		}
+		if (_shadowSpritePrefabWaitLoading == null) throw new System.NullReferenceException();
+		if (!_shadowSpritePrefabWaitLoading.ContainsKey(spriteName))
+		{
+			UnityEngine.Coroutine c = StartCoroutine(getShadowSpritePrefab(spriteName));
+			_shadowSpritePrefabWaitLoading[spriteName] = c;
+		}
+		return false;
+	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/createShadow.c RVA 0x18E4AC4
+	// Structure parallels createSprite but with key differences:
+	//   • cache key is the bare `spriteName` (no color/shader hash suffix)
+	//   • field offsets are the shadow set (0x50/0x58/0x68)
+	//   • material isn't reshadered — only a null-check for parity
+	//   • Final SpriteManager.CreateSprite uses (sm, spritePF, pos, rot) overload, where
+	//     pos = shadowPrefab.localPosition  and  rot = shadowPrefab.localRotation.
+	// String literals 10424 / 10426 → createShadow error messages.
 	public PackedSprite createShadow(string spriteName)
-	{ return default; }
+	{
+		if (!IsShadowReady(spriteName)) return null;
+		if (_shadowSpriteManagerPoolInst == null) throw new System.NullReferenceException();
+		SpriteManager sm = null;
+		if (!_shadowSpriteManagerPoolInst.ContainsKey(spriteName))
+		{
+			if (_shadowSpriteManagerPool == null) throw new System.NullReferenceException();
+			if (!_shadowSpriteManagerPool.ContainsKey(spriteName))
+			{
+				string msg = string.Format("SpriteManager is null...createShadow failed...({0}) ", spriteName);
+				UJDebug.Log(msg);
+				return null;
+			}
+			UnityEngine.GameObject prefabSM = _shadowSpriteManagerPool[spriteName];
+			if ((UnityEngine.Object)prefabSM != null)
+			{
+				UnityEngine.GameObject host = base.gameObject;
+				if ((UnityEngine.Object)host == null) throw new System.NullReferenceException();
+				UnityEngine.GameObject inst = UnityEngine.Object.Instantiate(prefabSM, host.transform);
+				if ((UnityEngine.Object)inst == null) throw new System.NullReferenceException();
+				inst.name = spriteName;
+				sm = inst.GetComponent<SpriteManager>();
+				_shadowSpriteManagerPoolInst[spriteName] = sm;
+			}
+			// Ghidra line 80-95: material null-check (no shader/color set, just probe).
+			if ((UnityEngine.Object)sm != null)
+			{
+				UnityEngine.Renderer rnd = sm.GetComponent<UnityEngine.Renderer>();
+				if ((UnityEngine.Object)rnd != null)
+				{
+					UnityEngine.Material mat = rnd.material;
+					// Ghidra calls op_Inequality(mat, 0) and discards the result — no setters.
+					_ = mat;
+				}
+			}
+		}
+		else
+		{
+			sm = _shadowSpriteManagerPoolInst[spriteName];
+		}
+
+		if (_shadowSpritePrefabPool == null) throw new System.NullReferenceException();
+		UnityEngine.GameObject spritePF = null;
+		if (_shadowSpritePrefabPool.ContainsKey(spriteName))
+		{
+			spritePF = _shadowSpritePrefabPool[spriteName];
+		}
+
+		if ((UnityEngine.Object)sm == null || (UnityEngine.Object)spritePF == null)
+		{
+			string msg = string.Format("SpriteManager or SpritePrefab is null...createShadow failed...({0})", spriteName);
+			UJDebug.Log(msg);
+			return null;
+		}
+
+		// Ghidra line 128-150: uses STATIC shadowPrefab's transform for the (pos, rot) overload.
+		if ((UnityEngine.Object)shadowPrefab == null) return null;
+		UnityEngine.Transform t = shadowPrefab.transform;
+		UnityEngine.Vector3 pos = t.localPosition;
+		UnityEngine.Quaternion rot = t.localRotation;
+		SpriteRoot sr = sm.CreateSprite(spritePF, pos, rot);
+		if (sr == null) return null;
+		return (PackedSprite)sr;
+	}
 
 	// Source: Ghidra work/06_ghidra/decompiled_rva/SpriteManagerPool___ctor.c RVA 0x18E4F84
 	// Allocates 10 Dictionary instances at field offsets 0x20..0x68 (8-byte fields).
