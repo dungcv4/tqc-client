@@ -226,6 +226,28 @@ public static class InMapStateLogger
                             sb.Append(" activeBlock=").Append(ab.GetType().Name);
                     }
                     sb.AppendLine();
+
+                    // DIAG: dump first 4 mesh verts + first 4 UVs to see if sprite slot has valid data.
+                    if (smr != null && smr.sharedMesh != null && smr.sharedMesh.vertexCount >= 4)
+                    {
+                        var verts = smr.sharedMesh.vertices;
+                        var uvs = smr.sharedMesh.uv;
+                        sb.Append("        slot0 verts: ");
+                        for (int vi = 0; vi < 4; vi++) sb.Append(verts[vi].ToString("F2")).Append(" ");
+                        sb.AppendLine();
+                        if (uvs != null && uvs.Length >= 4)
+                        {
+                            sb.Append("        slot0 uvs:   ");
+                            for (int vi = 0; vi < 4; vi++) sb.Append(uvs[vi].ToString("F3")).Append(" ");
+                            sb.AppendLine();
+                        }
+                        var bones = smr.bones;
+                        sb.Append("        bones: ").Append(bones != null ? bones.Length : -1)
+                          .Append(" rootBone=").Append(smr.rootBone != null ? smr.rootBone.name : "<null>");
+                        if (bones != null && bones.Length > 0 && bones[0] != null)
+                            sb.Append(" bones[0]=").Append(bones[0].name).Append("@").Append(bones[0].position.ToString("F1"));
+                        sb.AppendLine();
+                    }
                 }
             }
             else sb.AppendLine("    SpriteManager type NOT FOUND via reflection");
