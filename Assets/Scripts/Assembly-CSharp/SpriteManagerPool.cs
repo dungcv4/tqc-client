@@ -313,17 +313,33 @@ public class SpriteManagerPool : MonoBehaviour
 		}
 	}
 
-	// Source: dump.cs — Ghidra Awake.c not exported (likely sets singleton + DontDestroyOnLoad).
-	// [Deviation note: Ghidra batch did not emit SpriteManagerPool/Awake.c. Minimal MB init.]
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/Awake.c RVA 0x18E41B4
+	// 1-1: GameObject go = this.gameObject; DontDestroyOnLoad(go).
 	private void Awake()
 	{
+		UnityEngine.GameObject go = base.gameObject;
+		UnityEngine.Object.DontDestroyOnLoad(go);
 	}
 
-	// Source: dump.cs — Ghidra Start.c not exported.
-	// [Deviation note: Ghidra batch did not emit SpriteManagerPool/Start.c. Defaulting to no-op
-	//  so the pool entity doesn't block scene startup. Coroutine/pool init pending full decompile.]
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/Start.c RVA 0x18E4220
+	// 1-1:
+	//   _instance = this;                                              // **(WndRoot_static+0xb8)? — actually
+	//                                                                  // PTR_DAT_0344a8f8 = SpriteManagerPool
+	//                                                                  // type-info; +0xb8 → static fields;
+	//                                                                  // *8 → _instance slot.
+	//   moveSpriteMgrToCenter();
+	//   checkShadow();
+	//   RoleETC1AdditiveShader   = Shader.Find("Sango Online Classic/Role ETC1 Additive");      // lit 9806
+	//   RoleETC1TransparentShader= Shader.Find("Sango Online Classic/Role ETC1 Transparent");   // lit 9807
+	//   RoleETC1GrayShader       = Shader.Find("Sango Online Classic/Role ETC1_gray");          // lit 9808
 	private void Start()
 	{
+		_instance = this;
+		moveSpriteMgrToCenter();
+		checkShadow();
+		RoleETC1AdditiveShader    = UnityEngine.Shader.Find("Sango Online Classic/Role ETC1 Additive");
+		RoleETC1TransparentShader = UnityEngine.Shader.Find("Sango Online Classic/Role ETC1 Transparent");
+		RoleETC1GrayShader        = UnityEngine.Shader.Find("Sango Online Classic/Role ETC1_gray");
 	}
 
 	// Source: Ghidra work/06_ghidra/decompiled_rva/SpriteManagerPool__moveSpriteMgrToCenter.c RVA 0x18E4324
@@ -351,16 +367,128 @@ public class SpriteManagerPool : MonoBehaviour
 		t.position = new UnityEngine.Vector3(halfX, 0f, halfZ);
 	}
 
-	[IteratorStateMachine(typeof(_003CgetSpriteMgr_003Ed__23))]
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool_StateMachines/getSpriteMgr_MoveNext.c RVA 0x18E59B8
+	// + entry-thunk Ghidra .../SpriteManagerPool/getSpriteMgr.c RVA 0x18E43E8
+	// 1-1 mapping (compiler-generated state machine class `_003CgetSpriteMgr_003Ed__23` left in
+	//  this file as a dead-stub shell since the production binary advertises it via the
+	//  `IteratorStateMachine` attribute; we drop the attribute on the public method since the
+	//  compiler will auto-generate its own equivalent state-machine for this body):
+	//   if (_smPool.ContainsKey(spriteName)) yield break;                       // line 44-50 fast-exit
+	//   IUJObjectOperation op = ResourcesLoader.GetObjectTypeAssetDynamic(
+	//       AssetType.MODEL /* = 12 */,
+	//       spriteName + "_manager"                                              // lit 13650 "_manager"
+	//   );
+	//   while (!op.isDone) {
+	//       loadTime += WAITTIME;                                                // DAT_0091c238 ≈ 1/30
+	//       progress = op.progress;                                              // unused outside this loop
+	//       yield return new WaitForSeconds(WAITTIME);
+	//   }
+	//   if (op.values != null && op.values[0] != null) {                          // op_Inequality with null
+	//       _smPool.Add(spriteName, (GameObject)op.values[0]);
+	//   }
+	//   _smWaitLoading[spriteName] = null;                                        // mark not-waiting
 	private IEnumerator getSpriteMgr(string spriteName)
-	{ return default; }
+	{
+		if (_smPool == null || _spritePFPool == null || _smWaitLoading == null)
+			throw new System.NullReferenceException();
+		if (_smPool.ContainsKey(spriteName)) yield break;
+		IUJObjectOperation op = ResourcesLoader.GetObjectTypeAssetDynamic(
+			ResourcesLoader.AssetType.MODEL,
+			spriteName + "_manager",
+			null);
+		float loadTime = 0f;
+		float progress = 0f;
+		while (op != null && !op.isDone)
+		{
+			loadTime += WAITTIME;
+			progress = op.progress;
+			yield return new UnityEngine.WaitForSeconds(WAITTIME);
+		}
+		if (op != null && op.values != null && op.values.Length > 0)
+		{
+			UnityEngine.Object asset = op.values[0];
+			if ((UnityEngine.Object)asset != null)
+			{
+				_smPool[spriteName] = (UnityEngine.GameObject)asset;
+			}
+		}
+		_smWaitLoading[spriteName] = null;
+	}
 
-	[IteratorStateMachine(typeof(_003CgetSpritePrefab_003Ed__24))]
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool_StateMachines/getSpritePrefab_MoveNext.c RVA 0x18E5DD0
+	// + entry-thunk Ghidra .../SpriteManagerPool/getSpritePrefab.c RVA 0x18E4498
+	// Body parallels getSpriteMgr except:
+	//   • cache check + final store target is _spritePFPool (offset 0x40), not _smPool
+	//   • wait dict is _spritePFWaitLoading (offset 0x38)
+	//   • asset key is `spriteName` directly (no "_manager" suffix)
 	private IEnumerator getSpritePrefab(string spriteName)
-	{ return default; }
+	{
+		if (_spritePFPool == null || _spritePFWaitLoading == null)
+			throw new System.NullReferenceException();
+		if (_spritePFPool.ContainsKey(spriteName)) yield break;
+		IUJObjectOperation op = ResourcesLoader.GetObjectTypeAssetDynamic(
+			ResourcesLoader.AssetType.MODEL,
+			spriteName,
+			null);
+		float loadTime = 0f;
+		float progress = 0f;
+		while (op != null && !op.isDone)
+		{
+			loadTime += WAITTIME;
+			progress = op.progress;
+			yield return new UnityEngine.WaitForSeconds(WAITTIME);
+		}
+		if (op != null && op.values != null && op.values.Length > 0)
+		{
+			UnityEngine.Object asset = op.values[0];
+			if ((UnityEngine.Object)asset != null)
+			{
+				_spritePFPool[spriteName] = (UnityEngine.GameObject)asset;
+			}
+		}
+		_spritePFWaitLoading[spriteName] = null;
+	}
 
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteManagerPool/IsSpriteReady.c RVA 0x18D5F38
+	// 1-1 mapping:
+	//   if (_smPool == null) NRE;
+	//   if (_smPool.ContainsKey(spriteName)) {
+	//       if (_spritePFPool == null) NRE;
+	//       if (_spritePFPool.ContainsKey(spriteName)) return true;
+	//   }
+	//   if (_smWaitLoading == null) NRE;
+	//   if (!_smWaitLoading.ContainsKey(spriteName)) {
+	//       Coroutine c = StartCoroutine(getSpriteMgr(spriteName));
+	//       _smWaitLoading[spriteName] = c;
+	//   }
+	//   if (_spritePFWaitLoading == null) NRE;
+	//   if (!_spritePFWaitLoading.ContainsKey(spriteName)) {
+	//       Coroutine c = StartCoroutine(getSpritePrefab(spriteName));
+	//       _spritePFWaitLoading[spriteName] = c;
+	//   }
+	//   return false;
 	public bool IsSpriteReady(string spriteName)
-	{ return default; }
+	{
+		if (_smPool == null) throw new System.NullReferenceException();
+		if (_smPool.ContainsKey(spriteName))
+		{
+			if (_spritePFPool == null) throw new System.NullReferenceException();
+			if (_spritePFPool.ContainsKey(spriteName)) return true;
+		}
+		if (_smWaitLoading == null) throw new System.NullReferenceException();
+		if (!_smWaitLoading.ContainsKey(spriteName))
+		{
+			UnityEngine.Coroutine c = StartCoroutine(getSpriteMgr(spriteName));
+			_smWaitLoading[spriteName] = c;
+		}
+		if (_spritePFWaitLoading == null) throw new System.NullReferenceException();
+		if (!_spritePFWaitLoading.ContainsKey(spriteName))
+		{
+			UnityEngine.Coroutine c = StartCoroutine(getSpritePrefab(spriteName));
+			_spritePFWaitLoading[spriteName] = c;
+		}
+		return false;
+	}
 
 	public PackedSprite createSprite(string spriteName, byte r = byte.MaxValue, byte g = byte.MaxValue, byte b = byte.MaxValue, byte a = byte.MaxValue, byte lr = byte.MaxValue, byte lg = byte.MaxValue, byte lb = byte.MaxValue, byte la = byte.MaxValue, bool additiveShader = false, bool transparentShader = false, byte transparentAlpha = 0, bool grayShader = false, byte grayScale = 0, byte metal = 0, byte metalLevelsX = 0, byte metalLevelsY = byte.MaxValue, byte metalLevelsZ = 0, byte metalLevelsW = byte.MaxValue, byte metalGamma = 0)
 	{ return default; }
