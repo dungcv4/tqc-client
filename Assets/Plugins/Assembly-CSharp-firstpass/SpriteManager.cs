@@ -457,23 +457,281 @@ public class SpriteManager : MonoBehaviour
         RemoveSprite((SpriteMesh_Managed)sprite.spriteMesh);
     }
 
-    // RVA: 0x15756FC  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/RemoveSprite.c
-    public void RemoveSprite(SpriteMesh_Managed sprite) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/RemoveSprite.c RVA 0x15756FC
+    // 1-1:
+    //   if (sprite == null) NRE;
+    //   vertices[mv1] = vertices[mv2] = vertices[mv3] = vertices[mv4] = Vector3.zero;   // static prefab
+    //   activeBlocks.Remove(sprite);                                   // 0x48
+    //   if (this.gameObject != null) { bones[sprite.index] = this.transform; }   // 0x88, sprite+0x1c
+    //   sprite.Clear();                                                // SpriteMesh_Managed.Clear
+    //   SpriteRoot owner = sprite.sprite;                              // virtual (vtable+0x2a8)
+    //   if (owner == null) NRE;                                        // Ghidra falls through to NRE if get_sprite returns null
+    //   owner.spriteMesh = null;                                       // SpriteRoot.set_spriteMesh
+    //   sprite.sprite = null;                                          // virtual (vtable+0x2b8)
+    //   availableBlocks.Add(sprite);                                   // 0x30
+    //   vertsChanged = true;                                           // 0x38
+    //   if (activeBlocks.Count == 0) meshRenderer.enabled = false;     // 0x70 — disable when no sprites left
+    // Ghidra emits IL2CPP-array bounds-check IOOR throws inline (FUN_015cb904) — managed array
+    // indexer raises IndexOutOfRangeException automatically; no explicit guard needed.
+    public void RemoveSprite(SpriteMesh_Managed sprite)
+    {
+        if (sprite == null) throw new System.NullReferenceException();
+        if (vertices == null) throw new System.NullReferenceException();
+        vertices[sprite.mv1] = Vector3.zero;
+        vertices[sprite.mv2] = Vector3.zero;
+        vertices[sprite.mv3] = Vector3.zero;
+        vertices[sprite.mv4] = Vector3.zero;
+        if (activeBlocks == null) throw new System.NullReferenceException();
+        activeBlocks.Remove(sprite);
+        if ((UnityEngine.Object)gameObject != null)
+        {
+            if (bones == null) throw new System.NullReferenceException();
+            bones[sprite.index] = transform;
+        }
+        sprite.Clear();
+        SpriteRoot owner = sprite.sprite;     // virtual get_sprite
+        if (owner == null) throw new System.NullReferenceException();
+        owner.spriteMesh = null;
+        sprite.sprite = null;                 // virtual set_sprite
+        if (availableBlocks == null) throw new System.NullReferenceException();
+        availableBlocks.Add(sprite);
+        vertsChanged = true;
+        if (activeBlocks.get_Count() == 0)
+        {
+            if ((UnityEngine.Object)meshRenderer == null) throw new System.NullReferenceException();
+            meshRenderer.enabled = false;
+        }
+    }
 
-    // RVA: 0x15759FC  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/MoveToFront.c
-    public void MoveToFront(SpriteMesh_Managed s) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/MoveToFront.c RVA 0x15759FC
+    // 1-1: pop sprite at idx in spriteDrawOrder and push to back (= drawn last = on top).
+    //   int[] buffer = new int[6];                            // FUN_015cb754(int_klass, 6)
+    //   if (spriteDrawOrder == null) NRE;
+    //   int idx = spriteDrawOrder.IndexOf(s);
+    //   uVar11 = idx * 6;
+    //   if (uVar11 < 0) return;                               // not found
+    //   SpriteMesh_Managed last = spriteDrawOrder[Count - 1];
+    //   if (last == null || s == null) NRE;
+    //   s.drawLayer = last.drawLayer + 1;                     // (sprite+0x20)
+    //   if (triIndices == null) NRE;
+    //   if (idx*6 < triIndices.Length) {
+    //       for (k=0..5) buffer[k] = triIndices[idx*6 + k];
+    //       while (idx*6 + 1 < count*6 - 6) {                 // shift triangle k right-neighbour into [idx]
+    //           for (k=0..5) triIndices[idx*6 + k] = triIndices[(idx+1)*6 + k];
+    //           spriteDrawOrder[idx] = spriteDrawOrder[idx + 1];
+    //           idx++;
+    //       }
+    //       // tail: write buffer to [Count-1]*6
+    //       for (k=0..5) triIndices[(Count-1)*6 + k] = buffer[k];
+    //       spriteDrawOrder[Count - 1] = s;
+    //       vertCountChanged = true;
+    //   }
+    public void MoveToFront(SpriteMesh_Managed s)
+    {
+        int[] buffer = new int[6];
+        if (spriteDrawOrder == null) throw new System.NullReferenceException();
+        int idx = spriteDrawOrder.IndexOf(s);
+        if (idx * 6 < 0) return;                              // not found (idx == -1 → -6)
+        int count = spriteDrawOrder.Count;
+        SpriteMesh_Managed last = spriteDrawOrder[count - 1];
+        if (last == null) throw new System.NullReferenceException();
+        if (s == null) throw new System.NullReferenceException();
+        s.drawLayer = last.drawLayer + 1;
+        if (triIndices == null) throw new System.NullReferenceException();
+        if (idx * 6 >= triIndices.Length) return;
+        for (int k = 0; k < 6; k++) buffer[k] = triIndices[idx * 6 + k];
+        for (int i = idx; i < count - 1; i++)
+        {
+            for (int k = 0; k < 6; k++) triIndices[i * 6 + k] = triIndices[(i + 1) * 6 + k];
+            spriteDrawOrder[i] = spriteDrawOrder[i + 1];
+        }
+        for (int k = 0; k < 6; k++) triIndices[(count - 1) * 6 + k] = buffer[k];
+        spriteDrawOrder[count - 1] = s;
+        vertCountChanged = true;
+    }
 
-    // RVA: 0x1575DF8  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/MoveToBack.c
-    public void MoveToBack(SpriteMesh_Managed s) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/MoveToBack.c RVA 0x1575DF8
+    // 1-1: pop sprite at idx and push to front (= drawn first = behind everything).
+    //   buffer = new int[6];
+    //   if (spriteDrawOrder == null) NRE;
+    //   int idx = spriteDrawOrder.IndexOf(s);
+    //   if (idx*6 < 0) return;
+    //   SpriteMesh_Managed first = spriteDrawOrder[0];
+    //   if (first == null || s == null) NRE;
+    //   s.drawLayer = first.drawLayer - 1;
+    //   if (triIndices == null) NRE;
+    //   if (idx*6 < triIndices.Length) {
+    //       save buffer = triIndices[idx*6..+5];
+    //       for (i = idx; i > 0; i--) {                       // loop iterates while idx*6 > 5
+    //           triIndices[i*6..+5] = triIndices[(i-1)*6..+5];
+    //           spriteDrawOrder[i] = spriteDrawOrder[i - 1];
+    //       }
+    //       triIndices[0..5] = buffer;
+    //       spriteDrawOrder[0] = s;
+    //       vertCountChanged = true;
+    //   }
+    public void MoveToBack(SpriteMesh_Managed s)
+    {
+        int[] buffer = new int[6];
+        if (spriteDrawOrder == null) throw new System.NullReferenceException();
+        int idx = spriteDrawOrder.IndexOf(s);
+        if (idx * 6 < 0) return;
+        SpriteMesh_Managed first = spriteDrawOrder[0];
+        if (first == null) throw new System.NullReferenceException();
+        if (s == null) throw new System.NullReferenceException();
+        s.drawLayer = first.drawLayer - 1;
+        if (triIndices == null) throw new System.NullReferenceException();
+        if (idx * 6 >= triIndices.Length) return;
+        for (int k = 0; k < 6; k++) buffer[k] = triIndices[idx * 6 + k];
+        for (int i = idx; i > 0; i--)
+        {
+            for (int k = 0; k < 6; k++) triIndices[i * 6 + k] = triIndices[(i - 1) * 6 + k];
+            spriteDrawOrder[i] = spriteDrawOrder[i - 1];
+        }
+        for (int k = 0; k < 6; k++) triIndices[k] = buffer[k];
+        spriteDrawOrder[0] = s;
+        vertCountChanged = true;
+    }
 
-    // RVA: 0x15761C8  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/MoveInfrontOf.c
-    public void MoveInfrontOf(SpriteMesh_Managed toMove, SpriteMesh_Managed reference) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/MoveInfrontOf.c RVA 0x15761C8
+    // 1-1: relocate toMove to immediately in front of (after) reference in spriteDrawOrder.
+    //   Only proceeds if reference is currently AFTER toMove (idx_ref > idx_to); otherwise no-op.
+    //   buffer = new int[6];
+    //   if (spriteDrawOrder == null) NRE;
+    //   int idx_to  = spriteDrawOrder.IndexOf(toMove);   uVar10 = idx_to * 6;
+    //   int idx_ref = spriteDrawOrder.IndexOf(reference); uVar2 = idx_ref * 6;
+    //   if (uVar10 < 0 || uVar2 < uVar10) return;        // not found OR ref already behind toMove
+    //   if (reference == null || toMove == null) NRE;
+    //   toMove.drawLayer = reference.drawLayer + 1;
+    //   if (triIndices == null) NRE;
+    //   if (idx_to*6 < triIndices.Length) {
+    //       save buffer = triIndices[idx_to*6 .. +5];
+    //       for (i = idx_to; i < idx_ref; i++) {
+    //           triIndices[i*6..+5] = triIndices[(i+1)*6..+5];
+    //           spriteDrawOrder[i] = spriteDrawOrder[i + 1];
+    //       }
+    //       triIndices[idx_ref*6..+5] = buffer;
+    //       spriteDrawOrder[idx_ref] = toMove;
+    //       vertCountChanged = true;
+    //   }
+    public void MoveInfrontOf(SpriteMesh_Managed toMove, SpriteMesh_Managed reference)
+    {
+        int[] buffer = new int[6];
+        if (spriteDrawOrder == null) throw new System.NullReferenceException();
+        int idx_to  = spriteDrawOrder.IndexOf(toMove);
+        int idx_ref = spriteDrawOrder.IndexOf(reference);
+        if (idx_to * 6 < 0)          return;             // toMove not found
+        if (idx_ref * 6 < idx_to * 6) return;            // reference already behind toMove
+        if (reference == null) throw new System.NullReferenceException();
+        if (toMove == null)    throw new System.NullReferenceException();
+        toMove.drawLayer = reference.drawLayer + 1;
+        if (triIndices == null) throw new System.NullReferenceException();
+        if (idx_to * 6 >= triIndices.Length) return;
+        for (int k = 0; k < 6; k++) buffer[k] = triIndices[idx_to * 6 + k];
+        for (int i = idx_to; i < idx_ref; i++)
+        {
+            for (int k = 0; k < 6; k++) triIndices[i * 6 + k] = triIndices[(i + 1) * 6 + k];
+            spriteDrawOrder[i] = spriteDrawOrder[i + 1];
+        }
+        for (int k = 0; k < 6; k++) triIndices[idx_ref * 6 + k] = buffer[k];
+        spriteDrawOrder[idx_ref] = toMove;
+        vertCountChanged = true;
+    }
 
-    // RVA: 0x15765F0  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/MoveBehind.c
-    public void MoveBehind(SpriteMesh_Managed toMove, SpriteMesh_Managed reference) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/MoveBehind.c RVA 0x15765F0
+    // 1-1: relocate toMove to immediately behind (before) reference. Only proceeds if reference
+    //   is currently BEFORE toMove (idx_ref < idx_to); otherwise no-op.
+    //   if (uVar10 < 0 || uVar10 < uVar2) return;        // toMove not found OR toMove already behind ref
+    //   toMove.drawLayer = reference.drawLayer - 1;
+    //   save buffer = triIndices[idx_to*6 .. +5];
+    //   for (i = idx_to; i > idx_ref; i--) {
+    //       triIndices[i*6..+5] = triIndices[(i-1)*6..+5];
+    //       spriteDrawOrder[i] = spriteDrawOrder[i - 1];
+    //   }
+    //   triIndices[idx_ref*6..+5] = buffer;
+    //   spriteDrawOrder[idx_ref] = toMove;
+    //   vertCountChanged = true;
+    public void MoveBehind(SpriteMesh_Managed toMove, SpriteMesh_Managed reference)
+    {
+        int[] buffer = new int[6];
+        if (spriteDrawOrder == null) throw new System.NullReferenceException();
+        int idx_to  = spriteDrawOrder.IndexOf(toMove);
+        int idx_ref = spriteDrawOrder.IndexOf(reference);
+        if (idx_to * 6 < 0)          return;
+        if (idx_to * 6 < idx_ref * 6) return;            // toMove already behind reference
+        if (reference == null) throw new System.NullReferenceException();
+        if (toMove == null)    throw new System.NullReferenceException();
+        toMove.drawLayer = reference.drawLayer - 1;
+        if (triIndices == null) throw new System.NullReferenceException();
+        if (idx_to * 6 >= triIndices.Length) return;
+        for (int k = 0; k < 6; k++) buffer[k] = triIndices[idx_to * 6 + k];
+        for (int i = idx_to; i > idx_ref; i--)
+        {
+            for (int k = 0; k < 6; k++) triIndices[i * 6 + k] = triIndices[(i - 1) * 6 + k];
+            spriteDrawOrder[i] = spriteDrawOrder[i - 1];
+        }
+        for (int k = 0; k < 6; k++) triIndices[idx_ref * 6 + k] = buffer[k];
+        spriteDrawOrder[idx_ref] = toMove;
+        vertCountChanged = true;
+    }
 
-    // RVA: 0x1575144  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/SortDrawingOrder.c
-    public void SortDrawingOrder() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/SortDrawingOrder.c RVA 0x1575144
+    // 1-1:
+    //   if (spriteDrawOrder == null) return;                       // Ghidra: branch on (param_1+0x50)!=0
+    //   spriteDrawOrder.Sort(drawOrderComparer);
+    //   if (winding == CCW) {                                       // (param_1+0x20)==0
+    //       for (int i = 0, t = 0; i < spriteDrawOrder.Count; i++, t += 6) {
+    //           sm = spriteDrawOrder[i]; if (sm == null) break;
+    //           triIndices[t+0] = sm.mv1;  triIndices[t+1] = sm.mv2;  triIndices[t+2] = sm.mv4;
+    //           triIndices[t+3] = sm.mv4;  triIndices[t+4] = sm.mv2;  triIndices[t+5] = sm.mv3;
+    //       }
+    //   } else {                                                    // CW
+    //       triIndices[t+0]=mv1; triIndices[t+1]=mv4; triIndices[t+2]=mv2;
+    //       triIndices[t+3]=mv4; triIndices[t+4]=mv3; triIndices[t+5]=mv2;
+    //   }
+    //   vertCountChanged = true;     // 0x3b — guarantees LateUpdate flushes triangles next frame
+    // Note: Ghidra emits explicit bounds checks `(uVar2 <= uVar7+k) goto FUN_015cb904` (Cpp2IL IOOR
+    // thrower). In managed C# the same IndexOutOfRangeException is raised automatically by the
+    // array indexer — we don't need explicit checks.
+    public void SortDrawingOrder()
+    {
+        if (spriteDrawOrder == null) throw new System.NullReferenceException();
+        spriteDrawOrder.Sort(drawOrderComparer);
+        if (triIndices == null) throw new System.NullReferenceException();
+        int triPos = 0;
+        int count  = spriteDrawOrder.Count;
+        if (winding == SpriteRoot.WINDING_ORDER.CCW)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                SpriteMesh_Managed sm = spriteDrawOrder[i];
+                if (sm == null) break;
+                triIndices[triPos + 0] = sm.mv1;
+                triIndices[triPos + 1] = sm.mv2;
+                triIndices[triPos + 2] = sm.mv4;
+                triIndices[triPos + 3] = sm.mv4;
+                triIndices[triPos + 4] = sm.mv2;
+                triIndices[triPos + 5] = sm.mv3;
+                triPos += 6;
+            }
+        }
+        else
+        {
+            for (int i = 0; i < count; i++)
+            {
+                SpriteMesh_Managed sm = spriteDrawOrder[i];
+                if (sm == null) break;
+                triIndices[triPos + 0] = sm.mv1;
+                triIndices[triPos + 1] = sm.mv4;
+                triIndices[triPos + 2] = sm.mv2;
+                triIndices[triPos + 3] = sm.mv4;
+                triIndices[triPos + 4] = sm.mv3;
+                triIndices[triPos + 5] = sm.mv2;
+                triPos += 6;
+            }
+        }
+        vertCountChanged = true;
+    }
 
     // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/GetSprite.c RVA 0x1576A18
     // 1-1: if (sprites == null) throw NRE;
@@ -602,8 +860,77 @@ public class SpriteManager : MonoBehaviour
         }
     }
 
-    // RVA: 0x1576D64  Ghidra: work/06_ghidra/decompiled_full/SpriteManager/DoMirror.c
-    public virtual void DoMirror() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/DoMirror.c RVA 0x1576D64
+    // 1-1: editor-mode mirror of LateUpdate — runs from Editor inspector to refresh preview mesh.
+    //   if (Application.isPlaying) return;     // play-mode handled by LateUpdate
+    //   if (!vertCountChanged) {               // partial update branch
+    //       if (vertsChanged)  { vertsChanged = false; updateBounds = true; mesh.vertices = vertices; }
+    //       if (updateBounds)  { mesh.RecalculateBounds(); updateBounds = false; }
+    //       if (colorsChanged) { colorsChanged = false; mesh.colors = colors; }
+    //       if (uvsChanged)    { uvsChanged = false; mesh.uv = UVs; }
+    //   } else {                                 // big rebuild branch
+    //       updateBounds = false;
+    //       vertsChanged = uvsChanged = colorsChanged = vertCountChanged = false;
+    //       meshRenderer.bones = bones;
+    //       mesh.Clear();
+    //       mesh.vertices    = vertices;
+    //       mesh.bindposes   = bindPoses;
+    //       mesh.boneWeights = boneWeights;
+    //       mesh.uv          = UVs;
+    //       mesh.colors      = colors;
+    //       mesh.triangles   = triIndices;
+    //   }
+    // Differences vs LateUpdate: (a) DoMirror always forces updateBounds=true on vertsChanged
+    // (no autoUpdateBounds gate); (b) big-rebuild branch does NOT call RecalculateNormals or
+    // RecalculateBounds — editor inspector refresh is light.
+    public virtual void DoMirror()
+    {
+        if (UnityEngine.Application.isPlaying) return;
+        if (!vertCountChanged)
+        {
+            if (vertsChanged)
+            {
+                vertsChanged = false;
+                updateBounds = true;
+                if ((UnityEngine.Object)mesh == null) throw new System.NullReferenceException();
+                mesh.vertices = vertices;
+            }
+            if (updateBounds)
+            {
+                if ((UnityEngine.Object)mesh == null) throw new System.NullReferenceException();
+                mesh.RecalculateBounds();
+                updateBounds = false;
+            }
+            if (colorsChanged)
+            {
+                colorsChanged = false;
+                if ((UnityEngine.Object)mesh == null) throw new System.NullReferenceException();
+                mesh.colors = colors;
+            }
+            if (!uvsChanged) return;
+            uvsChanged = false;
+            if ((UnityEngine.Object)mesh == null) throw new System.NullReferenceException();
+            mesh.uv = UVs;
+        }
+        else
+        {
+            updateBounds     = false;
+            vertsChanged     = false;
+            uvsChanged       = false;
+            colorsChanged    = false;
+            vertCountChanged = false;
+            if ((UnityEngine.Object)meshRenderer == null) throw new System.NullReferenceException();
+            meshRenderer.bones = bones;
+            if ((UnityEngine.Object)mesh == null) throw new System.NullReferenceException();
+            mesh.Clear();
+            mesh.vertices    = vertices;
+            mesh.bindposes   = bindPoses;
+            mesh.boneWeights = boneWeights;
+            mesh.uv          = UVs;
+            mesh.colors      = colors;
+            mesh.triangles   = triIndices;
+        }
+    }
 
     // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/Update.c RVA 0x1576F08
     // 1-1: virtual-call indirection — production Update body is empty (the vtable slot at

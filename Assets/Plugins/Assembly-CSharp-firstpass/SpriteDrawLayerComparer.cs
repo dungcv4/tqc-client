@@ -19,10 +19,24 @@ using UnityEngine.Networking;
 // Source: Il2CppDumper-stub  TypeDefIndex: 8171
 public class SpriteDrawLayerComparer : IComparer<SpriteMesh_Managed>
 {
-    // RVA: 0x15774FC  Ghidra: work/06_ghidra/decompiled_full/SpriteDrawLayerComparer/Compare.c
-    public int Compare(SpriteMesh_Managed a, SpriteMesh_Managed b) { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteDrawLayerComparer/Compare.c RVA 0x15774FC
+    // 1-1:
+    //   if (a == null || b == null) NRE;
+    //   if (b.drawLayer < a.drawLayer) return  1;       // a comes after b (larger drawLayer drawn later)
+    //   if (a.drawLayer < b.drawLayer) return -1;
+    //   return 0;
+    // Ascending sort by SpriteMesh_Managed.drawLayer (field at +0x20).
+    public int Compare(SpriteMesh_Managed a, SpriteMesh_Managed b)
+    {
+        if (a == null) throw new System.NullReferenceException();
+        if (b == null) throw new System.NullReferenceException();
+        if (b.drawLayer < a.drawLayer) return 1;
+        if (a.drawLayer < b.drawLayer) return -1;
+        return 0;
+    }
 
-    // RVA: 0x15774F4  Ghidra: work/06_ghidra/decompiled_full/SpriteDrawLayerComparer/.ctor.c
-    public SpriteDrawLayerComparer() { throw new System.NotImplementedException(); }
+    // Source: Ghidra work/06_ghidra/decompiled_full/SpriteDrawLayerComparer/.ctor.c RVA 0x15774F4
+    // 1-1: System.Object..ctor only. No fields.
+    public SpriteDrawLayerComparer() { }
 
 }
