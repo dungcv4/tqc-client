@@ -255,6 +255,12 @@ public class SpriteManager : MonoBehaviour
         {
             sprites[i] = new SpriteMesh_Managed();
             sprites[i].index = i;
+            // Per Ghidra EnlargeArrays.c (line 199 set_manager + line 205-208 SetBuffers):
+            // each new sm must have manager wired AND mesh* alias buffers set BEFORE AddSprite
+            // later triggers the set_spriteMesh→set_sprite→UpdateColors chain. Without these,
+            // UpdateColors throws NRE on null meshColors and null m_manager.
+            sprites[i].manager = this;
+            sprites[i].SetBuffers(vertices, UVs, UVs2, colors);
             sprites[i].mv1 = i * 4 + 0;
             sprites[i].mv2 = i * 4 + 1;
             sprites[i].mv3 = i * 4 + 2;
