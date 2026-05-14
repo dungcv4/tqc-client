@@ -74,37 +74,66 @@ public class PackedSprite : AutoSpriteBase
 		get { return true; }
 	}
 
-	// Source: Ghidra GetDefaultPixelSize.c RVA 0x01572048 (61 lines)
-	// Complex method: if staticTexGUID is empty, return Vector2.zero. Otherwise call into
-	// guid2Path/loader delegates to load the texture, then return (1/(2*pixelSize.x)) * width.
-	// Full port requires PathFromGUIDDelegate/AssetLoaderDelegate Invoke virtual mapping.
-	// TODO RVA 0x01572048 — pending delegate Invoke vtable resolution.
+	// Source: Ghidra GetDefaultPixelSize.c RVA 0x01572048
+	// 1-1: if (staticTexGUID == "") return Vector2.zero;
+	//      string path = guid2Path.Invoke(staticTexGUID);
+	//      Texture2D tex = loader.Invoke(path, typeof(Texture2D)) as Texture2D;
+	//      if (tex == null) NRE;
+	//      float halfFrame = _ser_stat_frame_info.something_at_offset_0x20;  // width or similar
+	//      return Vector2(1 / (2 * halfFrame) * tex.width, ...).
+	// Ghidra simplifies to single float — full Vector2 inferred from C# signature.
 	public override Vector2 GetDefaultPixelSize(PathFromGUIDDelegate guid2Path, AssetLoaderDelegate loader)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (string.Equals(staticTexGUID, "")) return Vector2.zero;
+		if (guid2Path == null) throw new System.NullReferenceException();
+		string path = guid2Path(staticTexGUID);
+		if (loader == null) throw new System.NullReferenceException();
+		Texture2D tex = loader(path, typeof(Texture2D)) as Texture2D;
+		if ((UnityEngine.Object)tex == null) throw new System.NullReferenceException();
+		if (_ser_stat_frame_info == null) throw new System.NullReferenceException();
+		// _ser_stat_frame_info accessor at offset 0x20 returns the frame width/height. Pending
+		// CSpriteFrame field-name resolution — defer the exact axis. Approximation: return tex pixels
+		// scaled by 1/(2*frame.uvs.width).
+		float halfFrame = _ser_stat_frame_info.uvs.width;
+		if (halfFrame == 0f) return Vector2.zero;
+		float invHalf = 1f / (halfFrame + halfFrame);
+		return new Vector2(invHalf * tex.width, invHalf * tex.height);
 	}
 
 	// Source: Ghidra Awake.c RVA 0x01572210
-	// Body: lazy-allocate textureAnimations[0] if null. If _ser_stat_frame_info != null, copy via
-	// CSpriteFrame.ToStruct into staticFrameInfo. Then AutoSpriteBase.Awake(this) (super) and a
-	// virtual call at vtable+0x218 on this (likely InitUVs or PlayDefault).
-	// TODO RVA 0x01572210 — depends on AutoSpriteBase.Awake port + virtual slot mapping.
+	// 1-1: if (textureAnimations == null) textureAnimations = new TextureAnim[0];
+	//      if (_ser_stat_frame_info != null) CSpriteFrame.ToStruct(out staticFrameInfo, _ser_stat_frame_info);
+	//      AutoSpriteBase.Awake() (base);
+	//      Init() (virtual vtable+0x218 — PackedSprite override = SpriteRoot.Init).
 	protected override void Awake()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (textureAnimations == null) textureAnimations = new TextureAnim[0];
+		if (_ser_stat_frame_info == null) throw new System.NullReferenceException();
+		staticFrameInfo = _ser_stat_frame_info.ToStruct();
+		base.Awake();
+		Init();
 	}
 
 	// Source: Ghidra Start.c RVA 0x01572478
-	// Body: if (!started && SpriteBase.Start(this) and some flag) {
-	//          if (textureAnimations != null && pauseFrame < textureAnimations.Length &&
-	//              Application.isPlaying) {
-	//              virtual call vtable+0x4a8 (likely SetState or DoAnim) with pauseFrame
+	// 1-1: if (!m_started) {
+	//          SpriteBase.Start();
+	//          if (playAnimOnStart) {
+	//              if (textureAnimations != null && GetPauseFrame() < textureAnimations.Length &&
+	//                  Application.isPlaying) {
+	//                  PlayAnim(GetPauseFrame());   // virtual vtable+0x4a8 = PlayAnim(int)
+	//              }
 	//          }
-	//       }
-	// TODO RVA 0x01572478 — depends on SpriteBase.Start + virtual slot mapping.
+	//      }
 	public override void Start()
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		if (m_started) return;
+		base.Start();
+		if (!playAnimOnStart) return;
+		if (textureAnimations == null) return;
+		int pf = GetPauseFrame();
+		if (pf >= textureAnimations.Length) return;
+		if (!UnityEngine.Application.isPlaying) return;
+		PlayAnim(pf);
 	}
 
 	// Source: Ghidra Init.c RVA 0x0157252C
@@ -117,15 +146,48 @@ public class PackedSprite : AutoSpriteBase
 	}
 
 	// Source: Ghidra Copy.c RVA 0x01572534 (85 lines)
-	// Complex: super.Copy(s), then type-check s as PackedSprite. If uvsInitialized: direct field
-	// copy of staticFrameInfo. Otherwise CSpriteFrame.ToStruct from s._ser_stat_frame_info.
-	// Copies staticFrameInfo to this.staticFrameInfo, then if curAnim is null copies to frameInfo
-	// + uvRect (via virtual call vtable+0x298 or CalcSize). Else if curAnim is reverse, PlayAnim
-	// else virtual call vtable+0x408 (SetCurFrame?). Finally SpriteRoot.SetBleedCompensation.
-	// TODO RVA 0x01572534 — multi-step depends on AutoSpriteBase.Copy + SpriteRoot virtuals.
+	// 1-1: AutoSpriteBase.Copy(s); type-check s as PackedSprite. Copy staticFrameInfo (from struct
+	// or from CSpriteFrame.ToStruct). If curAnim == null → frameInfo = staticFrameInfo + SetSize or
+	// CalcSize. If curAnim is reverse (index == -1) → PlayAnim(curAnim). Else SetState(curAnim.index).
+	// Finally SpriteRoot.SetBleedCompensation(this).
 	public override void Copy(SpriteRoot s)
 	{
-		throw new AnalysisFailedException("No IL was generated.");
+		base.Copy(s);
+		if (s == null) return;
+		PackedSprite ps = s as PackedSprite;
+		if (ps == null) return;
+		if (!ps.uvsInitialized)
+		{
+			if (ps._ser_stat_frame_info == null) throw new System.NullReferenceException();
+			staticFrameInfo = ps._ser_stat_frame_info.ToStruct();
+		}
+		else
+		{
+			staticFrameInfo = ps.staticFrameInfo;
+		}
+		UVAnimation a = GetCurAnim();
+		if (a == null)
+		{
+			frameInfo = staticFrameInfo;
+			uvRect = staticFrameInfo.uvs;
+			if (!pixelPerfect && !autoResize)
+			{
+				SetSize(width, height);
+			}
+			else
+			{
+				CalcSize();
+			}
+		}
+		else if (a.index == -1)
+		{
+			PlayAnim(a);
+		}
+		else
+		{
+			SetState(a.index);
+		}
+		SetBleedCompensation();
 	}
 
 	// Source: Ghidra InitUVs.c RVA 0x01572978
