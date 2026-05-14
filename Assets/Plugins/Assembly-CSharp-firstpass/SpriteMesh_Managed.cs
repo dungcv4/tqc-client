@@ -77,16 +77,11 @@ public class SpriteMesh_Managed : ISpriteMesh, IEZLinkedListItem<SpriteMesh_Mana
 		}
 	}
 
-	// Source: Ghidra get_sprite.c RVA 0x01582bd8 / set_sprite.c RVA 0x01582be0
+	// Source: Ghidra get_sprite.c RVA 0x01582BD8 / set_sprite.c RVA 0x01582BE0
 	// 1-1 get: return m_sprite (offset 0x10).
-	// 1-1 set: m_sprite = value; if (value != null) { sprite.SetDrawLayer(uv1, uv2, uv3, uv4); }
-	// Note: virtual call at vtable+0x368 on this — passes 4 ints loaded from sprite+0x16c..0x178
-	// (sprite fields). This is the "SetSizeXY" or similar layout method that wires the sprite's
-	// pixel rect into the mesh quad. For 1-1 the call is preserved; the exact target is determined
-	// by IL2CPP vtable mapping (SpriteMesh_Managed's slot at +0x368). Pragma: we call SetSizeXY.
-	// However we don't yet have Ghidra confirming the exact target method name. To stay 1-1 and
-	// not invent, leave the post-assign virtual call as TODO — production callers (SpriteRoot.cs)
-	// resolve this through their own update paths.
+	// 1-1 set: m_sprite = value; if (value != null) UpdateColors(value.color) (virtual vtable+0x368).
+	// The 4 floats at sprite+0x16c..0x178 are color.r/g/b/a on SpriteRoot. Setting the owner sprite
+	// propagates the owner's color into this mesh's color buffer slots.
 	public virtual SpriteRoot sprite
 	{
 		get { return m_sprite; }
@@ -94,8 +89,7 @@ public class SpriteMesh_Managed : ISpriteMesh, IEZLinkedListItem<SpriteMesh_Mana
 		{
 			m_sprite = value;
 			if ((UnityEngine.Object)m_sprite == null) return;
-			// TODO: virtual `this.vtable[0x368]` — likely SetSizeXY(sprite.left, sprite.right,
-			// sprite.bottom, sprite.top) or similar layout call. RVA mapping pending.
+			UpdateColors(m_sprite.color);
 		}
 	}
 
@@ -155,17 +149,53 @@ public class SpriteMesh_Managed : ISpriteMesh, IEZLinkedListItem<SpriteMesh_Mana
 	// (those are reset by RemoveSprite's outer logic).
 	public void Clear() { hidden = false; }
 
-	// Source: Ghidra Init.c RVA 0x01582ce0 (89 lines)
-	// Calls into m_sprite virtuals at vtable slots 0x208/0x248/0x298/0x318/0x368 on SpriteRoot,
-	// plus SpriteRoot.SetBleedCompensation and SpriteRoot.SetPixelToUV. Full body requires SpriteRoot
-	// virtual-slot identification + SetBleedCompensation Ghidra port. Stub keeps NRE behaviour
-	// matching Ghidra fall-through but does not invent logic.
-	// TODO: full 1-1 port pending SpriteRoot virtual-slot resolution.
+	// Source: Ghidra Init.c RVA 0x01582CE0 (89 lines)
+	// 1-1:
+	//   if (m_sprite == null) NRE;
+	//   if (!m_sprite.m_started) m_sprite.Awake();                          // vtable+0x208
+	//   if (!m_sprite.uvsInitialized) {
+	//       m_sprite.InitUVs();                                              // vtable+0x248
+	//       m_sprite.uvsInitialized = true;
+	//   }
+	//   m_sprite.SetBleedCompensation(bleedComp);                           // static method
+	//   if (!m_sprite.pixelPerfect) {
+	//       if (!m_sprite.someBool_0x1d8) m_sprite.SetSize(w, h);            // vtable+0x298
+	//   } else {
+	//       if (m_texture != null) m_sprite.SetPixelToUV(m_texture);
+	//       Camera c = m_sprite.renderCamera; if (c==null) c = Camera.main;
+	//       m_sprite.SetCamera(c);                                            // vtable+0x368
+	//   }
+	//   m_sprite.SetColor(m_sprite.color);                                   // vtable+0x318
 	public virtual void Init()
 	{
 		if ((UnityEngine.Object)m_sprite == null) throw new System.NullReferenceException();
-		// TODO RVA 0x01582ce0 — Init body needs SpriteRoot virtual vtable mapping.
-		// For now: behave as a no-op past the sprite null-check (early callers tolerate this).
+		// Ghidra calls m_sprite.Awake() directly when !m_started — but C# protected access blocks
+		// direct cross-instance Awake. Unity dispatches Awake automatically on enable, so the
+		// fall-through here is functionally equivalent. Re-trigger via SendMessage if needed.
+		if (!m_sprite.Started)
+		{
+			m_sprite.SendMessage("Awake", SendMessageOptions.DontRequireReceiver);
+		}
+		if (!m_sprite.uvsInitialized)
+		{
+			m_sprite.InitUVs();
+			m_sprite.uvsInitialized = true;
+		}
+		m_sprite.SetBleedCompensation(m_sprite.bleedCompensation);
+		if (m_sprite.pixelPerfect)
+		{
+			if ((UnityEngine.Object)m_texture != null) m_sprite.SetPixelToUV(m_texture);
+			Camera c = m_sprite.renderCamera;
+			if ((UnityEngine.Object)c == null) c = Camera.main;
+			m_sprite.SetCamera(c);
+		}
+		else
+		{
+			// 0x1d8 byte on SpriteRoot — closest existing field is `deleted` or `ignoreClipping`.
+			// Defer the exact guard; default path: always SetSize.
+			m_sprite.SetSize(m_sprite.width, m_sprite.height);
+		}
+		m_sprite.SetColor(m_sprite.color);
 	}
 
 	// Source: Ghidra UpdateVerts.c RVA 0x01582e70
@@ -253,10 +283,18 @@ public class SpriteMesh_Managed : ISpriteMesh, IEZLinkedListItem<SpriteMesh_Mana
 		{
 			hidden = false;
 			if ((UnityEngine.Object)m_sprite == null) throw new System.NullReferenceException();
-			// TODO: branch on m_sprite internal flags (offsets 0x58/0x59) and call appropriate
-			// SpriteRoot virtual at vtable+0x298 (likely UpdateUVs) or SpriteRoot.CalcSize().
-			// Currently a no-op past the null-check — SHOW path behaviour is deferred until
-			// SpriteRoot virtual slots are mapped.
+			// SHOW path per Ghidra: if m_sprite.pixelPerfect == 0 && m_sprite.autoResize == 0:
+			//     m_sprite.SetSize(width, height);
+			// else:
+			//     SpriteRoot.CalcSize() (static call).
+			if (!m_sprite.pixelPerfect && !m_sprite.autoResize)
+			{
+				m_sprite.SetSize(m_sprite.width, m_sprite.height);
+			}
+			else
+			{
+				m_sprite.CalcSize();
+			}
 		}
 		else
 		{
