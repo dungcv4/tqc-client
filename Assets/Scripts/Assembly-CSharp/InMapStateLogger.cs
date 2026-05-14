@@ -156,6 +156,54 @@ public static class InMapStateLogger
             //     material null, sprite frame uvs all zero, scale zero, etc.
             sb.AppendLine("  PLAYER-100001 hierarchy + components:");
             DumpGoTree(sb, playerGo.transform, "    ", 0, 5);
+
+            // 6c. DIAG: SM2 architecture — PackedSprite has no own renderer; rendering is on the
+            //     SpriteManager that owns its slot. Find ALL SpriteManager objects in scene and log
+            //     their mesh state + sprite-slot count + sample player part manager refs.
+            sb.AppendLine("  All SpriteManager instances in scene:");
+            var smType = System.Type.GetType("SpriteManager, Assembly-CSharp-firstpass");
+            if (smType == null) smType = System.Type.GetType("SpriteManager");
+            if (smType != null)
+            {
+                UnityEngine.Object[] allSm = UnityEngine.Object.FindObjectsOfType(smType);
+                sb.Append("    Found ").Append(allSm.Length).AppendLine(" SpriteManager objects:");
+                foreach (UnityEngine.Object o in allSm)
+                {
+                    var comp = o as Component;
+                    if (comp == null) continue;
+                    var go = comp.gameObject;
+                    sb.Append("    - ").Append(GetPath(go.transform))
+                      .Append(" active=").Append(go.activeInHierarchy)
+                      .Append(" layer=").Append(go.layer);
+                    var rd = go.GetComponent<Renderer>();
+                    if (rd != null)
+                    {
+                        sb.Append(" RENDERER:").Append(rd.GetType().Name)
+                          .Append(" enabled=").Append(rd.enabled);
+                        if (rd.sharedMaterial != null) sb.Append(" mat=").Append(rd.sharedMaterial.name);
+                        else sb.Append(" mat=NULL");
+                    }
+                    else sb.Append(" NO-RENDERER");
+                    var mf = go.GetComponent<MeshFilter>();
+                    if (mf != null && mf.sharedMesh != null)
+                        sb.Append(" MESH:").Append(mf.sharedMesh.vertexCount).Append("v");
+                    else
+                        sb.Append(" NO-MESH");
+                    // SpriteManager.sprites field (reflection — public List<Sprite> sprites)
+                    var spritesField = smType.GetField("sprites", System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
+                    if (spritesField != null)
+                    {
+                        var spritesVal = spritesField.GetValue(comp);
+                        if (spritesVal != null)
+                        {
+                            var arr = spritesVal as System.Array;
+                            if (arr != null) sb.Append(" sprites[").Append(arr.Length).Append("]");
+                        }
+                    }
+                    sb.AppendLine();
+                }
+            }
+            else sb.AppendLine("    SpriteManager type NOT FOUND via reflection");
         }
         else
         {
@@ -263,6 +311,16 @@ public static class InMapStateLogger
         sb.AppendLine();
         for (int i = 0; i < t.childCount && i < 30; i++)
             DumpTree(sb, t.GetChild(i), depth + 1, maxDepth);
+    }
+
+    // Helper: build a "/Root/A/B/C" path string for a transform (limit to 6 parents).
+    static string GetPath(Transform t)
+    {
+        var sb2 = new System.Text.StringBuilder(128);
+        int cap = 6;
+        for (Transform cur = t; cur != null && cap > 0; cur = cur.parent, cap--)
+            sb2.Insert(0, "/" + cur.name);
+        return sb2.ToString();
     }
 
     // For PLAYER sub-tree: log GameObject + renderers + sprite components so we see why nothing draws.
