@@ -1,8 +1,10 @@
 // Source: Ghidra work/06_ghidra/decompiled_full/AdvImage/ (8 .c ported 1-1)
 // Source: dump.cs TypeDefIndex 156 — `AdvImage : Image`
-// 6/8 ported 1-1; 2 complex (GetModifiedMaterial 350+ lines stencil masking, GetDrawingDimensions
-// 400+ lines aspect-ratio math) kept as stub-with-RVA.
+// 7/8 ported 1-1 (incl. GetModifiedMaterial — RVA 0x17C2F40, real 77-line body via Ghidra +
+// StencilMaterialAlpha + reflection on MaskableGraphic privates). GetDrawingDimensions still
+// stub-with-RVA (0x17C3D18, aspect-ratio math — not on the mask/stencil path).
 
+using System.Reflection;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -93,13 +95,71 @@ public class AdvImage : Image
         cr.SetTexture(this.mainTexture);
     }
 
-    // Source: Ghidra GetModifiedMaterial.c  RVA 0x17C2F40
-    // TODO: 350+ line stencil masking with alpha — uses StencilMaterialAlpha.AddAlpha helper.
-    // Complex masking depth + grayscale composition. Port deferred.
+    // The three MaskableGraphic state fields Ghidra reads at this+0xa1/0xcc/0xa8
+    // (m_ShouldRecalculateStencil, m_StencilValue, m_MaskMaterial) are PRIVATE in stock
+    // UnityEngine.UI.MaskableGraphic — unreachable from a subclass override. Accessed via
+    // cached reflection on the EXACT same fields: logic/values are unchanged 1-1 (not chế
+    // cháo); reflection is only the access mechanism forced by C# visibility differing from
+    // the original's compiled context. (`maskable` @0xb8 is a public property → direct.)
+    private static readonly FieldInfo s_fiRecalc = typeof(MaskableGraphic).GetField("m_ShouldRecalculateStencil", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static readonly FieldInfo s_fiStencilVal = typeof(MaskableGraphic).GetField("m_StencilValue", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static readonly FieldInfo s_fiMaskMat = typeof(MaskableGraphic).GetField("m_MaskMaterial", BindingFlags.NonPublic | BindingFlags.Instance);
+
+    // Source: Ghidra work/06_ghidra/decompiled_full/AdvImage/GetModifiedMaterial.c  RVA 0x17C2F40
+    // dump.cs TypeDefIndex 156, Slot 58. Field offsets: m_ShouldRecalculateStencil@0xA1,
+    // m_StencilValue@0xCC, m_MaskMaterial@0xA8 (MaskableGraphic base), m_GrayScaleAmount@0x110.
     public override Material GetModifiedMaterial(Material baseMaterial)
     {
-        // TODO body RVA 0x017C2F40 — complex StencilMaterialAlpha composition
-        return base.GetModifiedMaterial(baseMaterial);  // safer fallback than NIE for per-frame UI render
+        bool shouldRecalc = (bool)s_fiRecalc.GetValue(this);          // this+0xA1
+        int stencilDepth;
+        if (!shouldRecalc)
+        {
+            stencilDepth = (int)s_fiStencilVal.GetValue(this);        // this+0xCC
+        }
+        else
+        {
+            Transform rootCanvas = MaskUtilities.FindRootSortOverrideCanvas(transform);
+            if (!maskable)                                            // this+0xB8
+            {
+                stencilDepth = 0;
+            }
+            else
+            {
+                stencilDepth = MaskUtilities.GetStencilDepth(transform, rootCanvas);
+            }
+            s_fiStencilVal.SetValue(this, stencilDepth);              // this+0xCC
+            s_fiRecalc.SetValue(this, false);                         // this+0xA1
+        }
+
+        int desiredBit;
+        if (stencilDepth == 0)
+        {
+            desiredBit = 9999;
+        }
+        else
+        {
+            int v = -1 << (stencilDepth & 0x1f);
+            if (v > -2)                                               // -2 < (int)uVar3
+            {
+                return baseMaterial;
+            }
+            desiredBit = ~v;
+        }
+
+        Mask maskComp = GetComponent<Mask>();
+        if (maskComp == null)                                         // op_Equality(maskComp, null)
+        {
+            float g = m_GrayScaleAmount;                              // this+0x110
+            int iGray = float.IsPositiveInfinity(g) ? int.MinValue : (int)g;
+            Material m = StencilMaterialAlpha.AddAlpha(baseMaterial, desiredBit,
+                (UnityEngine.Rendering.StencilOp)0, (UnityEngine.Rendering.CompareFunction)3,
+                (UnityEngine.Rendering.ColorWriteMask)0xf, desiredBit, 0, iGray);
+            Material oldMask = (Material)s_fiMaskMat.GetValue(this);   // this+0xA8
+            StencilMaterialAlpha.RemoveAlpha(oldMask);
+            s_fiMaskMat.SetValue(this, m);                            // this+0xA8
+            baseMaterial = m;
+        }
+        return baseMaterial;
     }
 
     // Source: Ghidra GetDrawingDimensions.c  RVA 0x17C3D18

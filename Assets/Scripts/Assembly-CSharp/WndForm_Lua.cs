@@ -310,20 +310,16 @@ public class WndForm_Lua : WndForm
     }
 
     // RVA: 0x18F75BC  Ghidra: work/06_ghidra/decompiled_full/WndForm_Lua/Event_AddListener.c
-    // 1-1 from Ghidra switch table: cases 0..9 attach a UnityAction-bound EventCallBack to a UnityEvent
-    // on a component fetched by GameObject.GetComponent<T>(). The component / event slot depends on eEventType:
-    //   0 → Toggle.onValueChanged (bool)              -> ctor with bool overload
-    //   1 → InputField.onValueChange (string)         -> int slot path with string overload (lVar5+0x50)
-    //   2 → EventTrigger entry (TriggerEvent<object>) -> trigger.entry with eEventID, action<BaseEventData>
-    //   3 → ScrollRect.onValueChanged (Vector2)       -> via Vector2 path at offset 0x138
-    //   4 → Dropdown.onValueChanged (int) (offset 0x148 with object route via LAB_019f7b88)
-    //   5 → Slider.onValueChanged (float) via Vector2 ctor at offset 0x68 (Slider uses float onChanged)
-    //   6 → Scrollbar.onValueChanged (float)
-    //   7 → Dropdown (offset 0x140)
-    //   8 → InputField.onEndEdit (string)
-    //   9 → InputField.onSubmit (string)
-    // Slot offsets directly match dump.cs field layouts of each UI component; ported as switch with
-    // the per-component event registration. EventCallBack.OnEvent overloads do the Lua dispatch.
+    // Source: EventTypes enum WndForm.lua:1 (0 Toggle, 1 UJScrollRectSnap, 2 Trigger, 3 Dropdown,
+    //   4 InputField, 5 ScrollRect, 6 Scroll(Scrollbar), 7 InputFieldEnd, 8 UJScrollRectSnapStart,
+    //   9 UJScrollRectSnapEnd). Ghidra confirms via GetComponent<T> + field-offset:
+    //   case1/8/9 GetComponent<UJScrollRectSnap> @0x50/0x58/0x60 = _onSnapFinished/_onSnapStart/
+    //   _onSnapEnd (UnityEvent<int>); case3 Dropdown@0x138; case4 InputField.onValueChanged@0x148;
+    //   case5 ScrollRect.onValueChanged@0x68 (Vector2); case6 Scrollbar.onValueChanged@0x118;
+    //   case7 InputField.onEndEdit@0x140.
+    // (Previous port mismapped the switch — case1 wired InputField instead of UJScrollRectSnap, so
+    //  WndForm Event_AddListener(UJScrollRectSnapEvent=1,…) found no InputField → page-snap events
+    //  OnScrollViewSnapFinished/Start/End never fired → skill/item page dots never updated. Fixed 1-1.)
     public void Event_AddListener(uint eEventType, uint eEventID, GameObject eventObj, string sLuaMethod)
     {
         if (eventObj == null)
@@ -332,7 +328,7 @@ public class WndForm_Lua : WndForm
         }
         switch (eEventType)
         {
-            case 0:
+            case 0:  // EventTypes.ToggleEvent
             {
                 Toggle t = eventObj.GetComponent<Toggle>();
                 if (t != null)
@@ -342,17 +338,17 @@ public class WndForm_Lua : WndForm
                 }
                 break;
             }
-            case 1:
+            case 1:  // EventTypes.UJScrollRectSnapEvent  → _onSnapFinished @0x50
             {
-                InputField inp = eventObj.GetComponent<InputField>();
-                if (inp != null)
+                UJScrollRectSnap snap = eventObj.GetComponent<UJScrollRectSnap>();
+                if (snap != null && snap.onSnapFinished != null)
                 {
                     var cb = new EventCallBack(this, sLuaMethod);
-                    inp.onValueChanged.AddListener(new UnityAction<string>(cb.OnEvent));
+                    snap.onSnapFinished.AddListener(new UnityAction<int>(cb.OnEvent));
                 }
                 break;
             }
-            case 2:
+            case 2:  // EventTypes.TriggerEvent
             {
                 EventTrigger et = eventObj.GetComponent<EventTrigger>();
                 if (et == null)
@@ -371,7 +367,27 @@ public class WndForm_Lua : WndForm
                 et.triggers.Add(entry);
                 break;
             }
-            case 3:
+            case 3:  // EventTypes.DropdownEvent
+            {
+                Dropdown dd = eventObj.GetComponent<Dropdown>();
+                if (dd != null)
+                {
+                    var cb = new EventCallBack(this, sLuaMethod);
+                    dd.onValueChanged.AddListener(new UnityAction<int>(cb.OnEvent));
+                }
+                break;
+            }
+            case 4:  // EventTypes.InputFieldEvent  → InputField.onValueChanged @0x148
+            {
+                InputField inp = eventObj.GetComponent<InputField>();
+                if (inp != null)
+                {
+                    var cb = new EventCallBack(this, sLuaMethod);
+                    inp.onValueChanged.AddListener(new UnityAction<string>(cb.OnEvent));
+                }
+                break;
+            }
+            case 5:  // EventTypes.ScrollRectEvent  → ScrollRect.onValueChanged @0x68 (Vector2)
             {
                 ScrollRect sr = eventObj.GetComponent<ScrollRect>();
                 if (sr != null)
@@ -381,27 +397,7 @@ public class WndForm_Lua : WndForm
                 }
                 break;
             }
-            case 4:
-            {
-                Dropdown dd = eventObj.GetComponent<Dropdown>();
-                if (dd != null)
-                {
-                    var cb = new EventCallBack(this, sLuaMethod);
-                    dd.onValueChanged.AddListener(new UnityAction<int>(cb.OnEvent));
-                }
-                break;
-            }
-            case 5:
-            {
-                Slider sl = eventObj.GetComponent<Slider>();
-                if (sl != null)
-                {
-                    var cb = new EventCallBack(this, sLuaMethod);
-                    sl.onValueChanged.AddListener(new UnityAction<float>(cb.OnEvent));
-                }
-                break;
-            }
-            case 6:
+            case 6:  // EventTypes.ScrollEvent  → Scrollbar.onValueChanged @0x118 (float)
             {
                 Scrollbar sb = eventObj.GetComponent<Scrollbar>();
                 if (sb != null)
@@ -411,17 +407,7 @@ public class WndForm_Lua : WndForm
                 }
                 break;
             }
-            case 7:
-            {
-                Dropdown dd = eventObj.GetComponent<Dropdown>();
-                if (dd != null)
-                {
-                    var cb = new EventCallBack(this, sLuaMethod);
-                    dd.onValueChanged.AddListener(new UnityAction<int>(cb.OnEvent));
-                }
-                break;
-            }
-            case 8:
+            case 7:  // EventTypes.InputFieldEndEvent  → InputField.onEndEdit @0x140
             {
                 InputField inp = eventObj.GetComponent<InputField>();
                 if (inp != null)
@@ -431,13 +417,23 @@ public class WndForm_Lua : WndForm
                 }
                 break;
             }
-            case 9:
+            case 8:  // EventTypes.UJScrollRectSnapStartEvent  → _onSnapStart @0x58
             {
-                InputField inp = eventObj.GetComponent<InputField>();
-                if (inp != null)
+                UJScrollRectSnap snap = eventObj.GetComponent<UJScrollRectSnap>();
+                if (snap != null && snap.onSnapStart != null)
                 {
                     var cb = new EventCallBack(this, sLuaMethod);
-                    inp.onSubmit.AddListener(new UnityAction<string>(cb.OnEvent));
+                    snap.onSnapStart.AddListener(new UnityAction<int>(cb.OnEvent));
+                }
+                break;
+            }
+            case 9:  // EventTypes.UJScrollRectSnapEndEvent  → _onSnapEnd @0x60
+            {
+                UJScrollRectSnap snap = eventObj.GetComponent<UJScrollRectSnap>();
+                if (snap != null && snap.onSnapEnd != null)
+                {
+                    var cb = new EventCallBack(this, sLuaMethod);
+                    snap.onSnapEnd.AddListener(new UnityAction<int>(cb.OnEvent));
                 }
                 break;
             }
