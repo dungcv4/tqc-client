@@ -99,6 +99,17 @@ AssetRipper_*.log
 !/Assets/Scenes/
 !/Assets/Scenes.meta
 
+# Shaders: 1-1 reverse-engineered from APK GLSL bytecode (our code, not raw
+# IP assets). 3500+ Role ETC1 variants are byte-identical → git delta-compresses
+# to ~270KB. Worth versioning as rollback/backup of the shader port pipeline.
+!/Assets/Shader/
+!/Assets/Shader.meta
+# Resources/ stays ignored (game-IP prefabs) EXCEPT our ported shaders subtree.
+!/Assets/Resources/
+/Assets/Resources/*
+!/Assets/Resources/shaders/
+!/Assets/Resources.meta
+
 # (Explicitly skipped — game IP / large / not edited by us)
 # /Assets/AnimationClip/    /Assets/AnimatorController/   /Assets/Avatar/
 # /Assets/Cubemap/          /Assets/Font/                 /Assets/GameObject/
