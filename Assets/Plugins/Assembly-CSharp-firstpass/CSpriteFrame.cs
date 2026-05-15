@@ -54,16 +54,18 @@ public class CSpriteFrame
 	}
 
 	// Source: Ghidra _ctor.c RVA 0x015836EC
-	// 1-1: initialize all 5 Vector2's to (1, 1) via NEON_fmov 4× 1.0f SIMD + static (1,1) loads.
-	// Verified: auVar4 = NEON_fmov(0x3f800000, 4) → 4 floats of 1.0f, split into
-	// _0_8_ (1,1) and _8_8_ (1,1). Then _DAT_0091c600 / _UNK_0091c608 / DAT_008e36b0 are
-	// Vector2(1,1) constants loaded from rodata (matches SPRITE_FRAME._ctor pattern).
+	// 1-1 binary-verified:
+	//   auVar4 = NEON_fmov(0x3f800000, 4) → 4 floats of 1.0f → uvs = Rect(1,1,1,1)
+	//   _DAT_0091c600 = (0.5, 0.5)   → scaleFactor
+	//   _UNK_0091c608 = (-1.0, 1.0)  → topLeftOffset
+	//   DAT_008e36b0  = (1.0, -1.0)  → bottomRightOffset
+	// Cpp2IL decompile incorrectly defaulted all 3 Vector2 statics to (1, 1).
 	public CSpriteFrame()
 	{
 		uvs               = new Rect(1f, 1f, 1f, 1f);
-		scaleFactor       = Vector2.one;
-		topLeftOffset     = Vector2.one;
-		bottomRightOffset = Vector2.one;
+		scaleFactor       = new Vector2(0.5f, 0.5f);
+		topLeftOffset     = new Vector2(-1f, 1f);
+		bottomRightOffset = new Vector2(1f, -1f);
 	}
 
 	// Source: Ghidra _ctor_1.c RVA 0x01583710
@@ -71,9 +73,9 @@ public class CSpriteFrame
 	public CSpriteFrame(CSpriteFrame f)
 	{
 		uvs               = new Rect(1f, 1f, 1f, 1f);
-		scaleFactor       = Vector2.one;
-		topLeftOffset     = Vector2.one;
-		bottomRightOffset = Vector2.one;
+		scaleFactor       = new Vector2(0.5f, 0.5f);
+		topLeftOffset     = new Vector2(-1f, 1f);
+		bottomRightOffset = new Vector2(1f, -1f);
 		if (f == null) throw new System.NullReferenceException();
 		uvs               = f.uvs;
 		scaleFactor       = f.scaleFactor;
@@ -86,9 +88,9 @@ public class CSpriteFrame
 	public CSpriteFrame(SPRITE_FRAME f)
 	{
 		uvs               = new Rect(1f, 1f, 1f, 1f);
-		scaleFactor       = Vector2.one;
-		topLeftOffset     = Vector2.one;
-		bottomRightOffset = Vector2.one;
+		scaleFactor       = new Vector2(0.5f, 0.5f);
+		topLeftOffset     = new Vector2(-1f, 1f);
+		bottomRightOffset = new Vector2(1f, -1f);
 		uvs               = f.uvs;
 		scaleFactor       = f.scaleFactor;
 		topLeftOffset     = f.topLeftOffset;

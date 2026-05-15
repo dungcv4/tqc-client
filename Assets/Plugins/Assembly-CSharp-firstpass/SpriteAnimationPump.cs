@@ -311,37 +311,17 @@ public class SpriteAnimationPump : MonoBehaviour
 	{
 		if (isPaused) return;
 		float dt = Time.deltaTime * _timeScale;
-		// DIAG: log every 60 frames to confirm pump is ticking + count sprites in list.
-		_pumpTickCount++;
-		if (_pumpTickCount % 60 == 0)
-		{
-			int count = 0;
-			ISpriteAnimatable n = head;
-			while (n != null) { count++; n = n.next; if (count > 1000) break; }
-			UnityEngine.Debug.LogError($"[ANIM-PUMP] tick={_pumpTickCount} dt={dt} timeScale={_timeScale} listCount={count}");
-		}
 		cur = head;
 		while (cur != null)
 		{
 			next = cur.next;
 			try { cur.StepAnim(dt); }
-			catch (System.Exception ex)
-			{
-				_pumpExCount++;
-				if (_pumpExCount % 60 == 0)
-				{
-					string goName = "(unknown)";
-					if (cur is MonoBehaviour mb && mb != null) goName = mb.gameObject.name;
-					UnityEngine.Debug.LogError($"[PUMP-EX] cnt={_pumpExCount} go={goName} {ex.GetType().Name}: {ex.Message}");
-				}
-			}
+			catch (System.Exception) { /* don't break pump on individual sprite errors */ }
 			cur = next;
 		}
 		cur = null;
 		next = null;
 	}
-	private static int _pumpTickCount = 0;
-	private static int _pumpExCount = 0;
 
 	// Source: Ghidra _ctor.c RVA 0x0157E6F0
 	// 1-1: MonoBehaviour..ctor() (implicit base call)

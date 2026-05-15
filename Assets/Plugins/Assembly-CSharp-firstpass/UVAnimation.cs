@@ -74,8 +74,9 @@ public class UVAnimation
 	//      length = (1/framerate) * frames.Length.
 	public UVAnimation(UVAnimation anim)
 	{
+		// Initial state (DAT_008e3c08): curFrame=-1, stepDir=+1. Overwritten by copy below.
 		curFrame  = -1;
-		stepDir   = -1;
+		stepDir   = 1;
 		framerate = 15f;
 		index     = -1;
 		if (anim == null) throw new System.NullReferenceException();
@@ -105,26 +106,30 @@ public class UVAnimation
 	}
 
 	// Source: Ghidra _ctor.c RVA 0x01579AB4
-	// 1-1: curFrame=-1, stepDir=-1 (packed write at 0x18 of DAT_008e3c08 = -1,-1);
+	// 1-1: 8-byte write of DAT_008e3c08 at 0x18 → (curFrame, stepDir).
+	//      Binary-verified: file offset 0x7e3c08 = FF FF FF FF 01 00 00 00 (LE)
+	//      → curFrame=-1, stepDir=+1. Cpp2IL incorrectly decompiled as (-1, -1).
 	//      framerate=15f (0x41700000), index=-1 (packed at 0x40 of 0xFFFFFFFF41700000);
 	//      System.Object..ctor; frames = new SPRITE_FRAME[0].
 	public UVAnimation()
 	{
 		curFrame  = -1;
-		stepDir   = -1;
+		stepDir   = 1;
 		framerate = 15f;
 		index     = -1;
 		frames    = new SPRITE_FRAME[0];
 	}
 
 	// Source: Ghidra Reset.c RVA 0x0157A938
-	// 1-1: numLoops=0; playInReverse=false; curFrame=-1, stepDir=-1 (8-byte write of DAT_008e3c08).
+	// 1-1: numLoops=0; playInReverse=false; 8-byte write of DAT_008e3c08 to (curFrame, stepDir).
+	// Binary-verified: DAT_008e3c08 at file offset 0x7e3c08 = FF FF FF FF 01 00 00 00 (LE)
+	// → curFrame=-1, stepDir=+1. Cpp2IL decompile mis-reads stepDir as -1.
 	public void Reset()
 	{
 		numLoops      = 0;
 		playInReverse = false;
 		curFrame      = -1;
-		stepDir       = -1;
+		stepDir       = 1;
 	}
 
 	// Source: Ghidra PlayInReverse.c RVA 0x0157AC08

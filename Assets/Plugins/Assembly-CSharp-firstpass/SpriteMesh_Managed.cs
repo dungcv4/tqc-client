@@ -228,20 +228,6 @@ public class SpriteMesh_Managed : ISpriteMesh, IEZLinkedListItem<SpriteMesh_Mana
 		Vector2[] src = this.uvs;     // virtual call (vtable+0x2f8)
 		if (src == null) throw new System.NullReferenceException();
 		if (meshUVs == null) throw new System.NullReferenceException();
-		// ONE-TIME per-sprite: log the manager GO + slot so we map sprite→manager
-		if (!_firstManagedUvLogged)
-		{
-			_firstManagedUvLogged = true;
-			string goName = ((UnityEngine.Object)m_sprite != null) ? m_sprite.gameObject.name : "(no-sprite)";
-			string mgrName = ((UnityEngine.Object)m_manager != null) ? m_manager.gameObject.name : "NULL";
-			UnityEngine.Debug.LogError($"[FIRST-MGR-UV] sprite={goName} mgr={mgrName} idx=[{uv1},{uv2},{uv3},{uv4}] meshUVsLen={meshUVs.Length}");
-		}
-		_managedUvsDiagCount++;
-		if (_managedUvsDiagCount % 120 == 0)
-		{
-			string goName2 = ((UnityEngine.Object)m_sprite != null) ? m_sprite.gameObject.name : "(no-sprite)";
-			UnityEngine.Debug.LogError($"[MANAGED-UV] go={goName2} idx=[{uv1},{uv2},{uv3},{uv4}] src0=({src[0].x:F4},{src[0].y:F4}) src2=({src[2].x:F4},{src[2].y:F4}) meshUVsLen={meshUVs.Length} mgrNull={((UnityEngine.Object)m_manager==null)}");
-		}
 		meshUVs[uv1] = src[0];
 		meshUVs[uv2] = src[1];
 		meshUVs[uv3] = src[2];
@@ -339,6 +325,4 @@ public class SpriteMesh_Managed : ISpriteMesh, IEZLinkedListItem<SpriteMesh_Mana
 		m_uvs      = new Vector2[4];
 		m_uvs2     = new Vector2[4];
 	}
-	private static int _managedUvsDiagCount = 0;
-	private bool _firstManagedUvLogged = false;
 }

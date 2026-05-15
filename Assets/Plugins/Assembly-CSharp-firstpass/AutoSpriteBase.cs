@@ -338,12 +338,6 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		if (curAnim == null) return false;
 		timeSinceLastFrame += time;
 		framesToAdvance = timeSinceLastFrame / timeBetweenAnimFrames;
-		// DIAG: log every 60 calls per sprite to verify StepAnim is advancing
-		_stepDiagCount++;
-		if (_stepDiagCount % 60 == 0)
-		{
-			UnityEngine.Debug.LogError($"[STEP-DIAG] go={gameObject.name} anim='{curAnim.name}' time={time} tslf={timeSinceLastFrame} tbf={timeBetweenAnimFrames} framesToAdvance={framesToAdvance} curFrame={curAnim.curFrame} totalFrames={(curAnim.frames!=null?curAnim.frames.Length:-1)}");
-		}
 		if (framesToAdvance < 1f)
 		{
 			if (crossfadeFrames)
@@ -402,16 +396,6 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 					}
 				}
 				uvRect = frameInfo.uvs;
-				if (!_firstAdvanceLogged)
-				{
-					_firstAdvanceLogged = true;
-					UnityEngine.Debug.LogError($"[FIRST-ADV] go={gameObject.name} uvRect=({frameInfo.uvs.x:F4},{frameInfo.uvs.y:F4},{frameInfo.uvs.width:F4},{frameInfo.uvs.height:F4}) mesh={(m_spriteMesh==null?"NULL":m_spriteMesh.GetType().Name)}");
-				}
-				_advanceCount++;
-				if (_advanceCount % 240 == 0)
-				{
-					UnityEngine.Debug.LogError($"[ADV-TICK] go={gameObject.name} cnt={_advanceCount}");
-				}
 				SetBleedCompensation(bleedCompensation);
 				if (autoResize || pixelPerfect) CalcSize();
 				else if ((int)anchor == 9) CalcSize();   // TEXTURE_OFFSET — recompute extents
@@ -527,7 +511,12 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		if (!m_started) SendMessage("Awake", SendMessageOptions.DontRequireReceiver);
 		curAnim = anim;
 		curAnimIndex = anim.index;
-		anim.frames = anim.frames;        // keep — Ghidra sets curAnim.frames = anim.frames (alias)
+		// Ghidra PlayAnim line 42: *(undefined8 *)(curAnim + 0x18) = DAT_008e3c08;
+		// Writes 8 bytes at curAnim.curFrame (0x18) + curAnim.stepDir (0x1c).
+		// DAT_008e3c08 = 0x00000001FFFFFFFF → (curFrame=-1, stepDir=+1)
+		// cpp2il decompile mis-reads this as (curFrame=-1, stepDir=-1) which breaks RUN.
+		anim.curFrame = -1;
+		anim.stepDir = 1;
 		anim.numLoops = 0;
 		anim.playInReverse = false;
 		int len = anim.frames.Length;
@@ -599,9 +588,6 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		}
 		PlayAnim(animations[index], 0);
 	}
-	private static int _stepDiagCount = 0;
-	private bool _firstAdvanceLogged = false;
-	private static int _advanceCount = 0;
 
 	// Source: Ghidra PlayAnim_4.c RVA 0x0157AB54
 	// 1-1: linear search through animations[i].name (offset 0x30); if match → PlayAnim(found, frame).
@@ -897,10 +883,10 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 	}
 
 	// Source: Ghidra StopAnim.c RVA 0x0157B328
-	// 1-1: SpriteBase.PauseAnim() (virtual vtable+0x508); reset curAnim curFrame/stepDir/frames=null;
-	//      RevertToStatic().
-	// curAnim.curFrame and stepDir are protected — use UVAnimation.Reset() which mirrors the IL2CPP
-	// field reset (curFrame=0, stepDir=0, frames=null). Provides equivalent behaviour.
+	// 1-1: PauseAnim (vtable+0x508); if curAnim != null:
+	//   numLoops=0, playInReverse=false, (curFrame, stepDir)=DAT_008e3c08=(-1, +1);
+	//   RevertToStatic.
+	// UVAnimation.Reset() encapsulates the numLoops/playInReverse/(curFrame,stepDir) reset.
 	public override void StopAnim()
 	{
 		PauseAnim();
