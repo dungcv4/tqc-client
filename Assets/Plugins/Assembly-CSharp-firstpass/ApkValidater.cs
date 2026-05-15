@@ -155,16 +155,15 @@ public class ApkValidater
         throw new System.NullReferenceException();
     }
 
-    // RVA: 0x158A5BC  Ghidra: work/06_ghidra/decompiled_full/ApkValidater/isRootedPrivate.c
+    // Source: Ghidra work/06_ghidra/decompiled_full/ApkValidater/isRootedPrivate.c RVA 0x158A5BC
+    // dump.cs: public static bool isRootedPrivate(string path)
+    // Ghidra body: `System_IO_File__Exists(param_1,0); return;` — this is the standard
+    // Ghidra tail-call-return artifact: a bool-returning function whose entire body is a
+    // single call shows as `Call(args); return;` because the callee's result flows out
+    // through the return register (w0). 1-1 C# = `return File.Exists(path);`.
     public static bool isRootedPrivate(string path)
     {
-        // Ghidra body: System_IO_File__Exists(param_1,0); return; (return value discarded).
-        // Translated faithfully — the call's result is not propagated.
-        System.IO.File.Exists(path);
-        // TODO: confidence:low — Ghidra body returns void (no explicit return value);
-        // declared signature is bool. Returning the File.Exists result is the most
-        // plausible intent but Ghidra dropped the assignment.
-        throw new System.NotImplementedException();
+        return System.IO.File.Exists(path);
     }
 
     // RVA: 0x158A5C4  Ghidra: work/06_ghidra/decompiled_full/ApkValidater/.ctor.c
