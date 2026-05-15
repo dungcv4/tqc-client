@@ -18,8 +18,17 @@ using UnityEngine.Networking;
 
 namespace MarsSDK.LitJson
 {
-    // Source: Il2CppDumper-stub  TypeDefIndex: 8232
+    // Source: dump.cs (work/03_il2cpp_dump/dump.cs) TypeDefIndex: 8232
+    // Pure enum — no method bodies to port. Values verified 1-1 against dump.cs.
     public enum JsonType
     {
+        None = 0,
+        Object = 1,
+        Array = 2,
+        String = 3,
+        Int = 4,
+        Long = 5,
+        Double = 6,
+        Boolean = 7,
     }
 }

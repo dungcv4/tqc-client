@@ -225,11 +225,19 @@ public class SpriteMesh : ISpriteMesh
 	// 1-1: if (m_mesh == null) return; m_mesh.uv = m_uvs; if (m_useUV2) m_mesh.uv2 = m_uvs2.
 	public virtual void UpdateUVs()
 	{
-		if ((UnityEngine.Object)m_mesh == null) return;
+		_updateUvsDiagCount++;
+		bool meshNull = ((UnityEngine.Object)m_mesh == null);
+		if (_updateUvsDiagCount % 120 == 0)
+		{
+			string goName = (m_sprite != null && (UnityEngine.Object)m_sprite != null) ? m_sprite.gameObject.name : "(no-sprite)";
+			UnityEngine.Debug.LogError($"[MESH-UV] go={goName} meshNull={meshNull} uvs={(m_uvs==null?"NULL":$"len={m_uvs.Length}, uv[0]=({m_uvs[0].x:F4},{m_uvs[0].y:F4}) uv[2]=({m_uvs[2].x:F4},{m_uvs[2].y:F4})")} meshFilter={((UnityEngine.Object)meshFilter==null?"NULL":"OK")} meshRend={((UnityEngine.Object)meshRenderer==null?"NULL":"OK")} sharedMat={(meshRenderer!=null&&meshRenderer.sharedMaterial!=null?meshRenderer.sharedMaterial.name:"NULL")}");
+		}
+		if (meshNull) return;
 		m_mesh.uv = m_uvs;
 		if (!m_useUV2) return;
 		m_mesh.uv2 = m_uvs2;
 	}
+	private static int _updateUvsDiagCount = 0;
 
 	// Source: Ghidra UpdateColors.c RVA 0x0158258C
 	// 1-1: m_colors[0..3] = color; if (m_mesh != null) m_mesh.colors = m_colors.

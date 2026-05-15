@@ -769,7 +769,20 @@ public class SpriteManager : MonoBehaviour
 
     // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/UpdateUVs.c RVA 0x1576A60
     // 1-1: uvsChanged = true;
-    public void UpdateUVs() { uvsChanged = true; }
+    public void UpdateUVs()
+    {
+        uvsChanged = true;
+        _uvsChTickCount++;
+        if (!_firstUvsChLogged)
+        {
+            _firstUvsChLogged = true;
+            UnityEngine.Debug.LogError($"[FIRST-MGR-TICK] go={gameObject.name}");
+        }
+        if (_uvsChTickCount % 60 == 0)
+            UnityEngine.Debug.LogError($"[MGR-TICK] go={gameObject.name} cnt={_uvsChTickCount}");
+    }
+    private bool _firstUvsChLogged = false;
+    private static int _uvsChTickCount = 0;
 
     // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/UpdateColors.c RVA 0x1576A6C
     // 1-1: colorsChanged = true;
@@ -836,7 +849,15 @@ public class SpriteManager : MonoBehaviour
     //   }
     public virtual void LateUpdate()
     {
-        if ((UnityEngine.Object)mesh == null) return;        // nothing wired yet — Awake hasn't run
+        _myLateUpdateCount++;
+        if (_myLateUpdateCount == 1 || _myLateUpdateCount % 300 == 0)
+        {
+            UnityEngine.Debug.LogError($"[LATE-PATH] go={gameObject.name} call#{_myLateUpdateCount} meshNull={(UnityEngine.Object)mesh==null} vertCountCh={vertCountChanged} uvsCh={uvsChanged} vertsCh={vertsChanged}");
+        }
+        if ((UnityEngine.Object)mesh == null)
+        {
+            return;
+        }
         if (vertCountChanged)
         {
             updateBounds     = false;
@@ -854,6 +875,15 @@ public class SpriteManager : MonoBehaviour
             mesh.triangles   = triIndices;
             mesh.RecalculateNormals();
             if (autoUpdateBounds) mesh.RecalculateBounds();
+            // DIAG: log rebuild path - this is path B (full rebuild + UV)
+            _rebuildCount++;
+            if (_rebuildCount % 60 == 0)
+            {
+                int len = (UVs != null) ? UVs.Length : -1;
+                int lastIdx = len - 4;
+                string sample = (lastIdx>=0 && len>0) ? $"UVs[{lastIdx}]=({UVs[lastIdx].x:F3},{UVs[lastIdx].y:F3})" : "n/a";
+                UnityEngine.Debug.LogError($"[MGR-REBUILD] go={gameObject.name} cnt={_rebuildCount} {sample} vCnt={mesh.vertexCount} matName={(meshRenderer!=null&&meshRenderer.sharedMaterial!=null?meshRenderer.sharedMaterial.name:"NULL")}");
+            }
             return;
         }
         if (vertsChanged)
@@ -876,8 +906,32 @@ public class SpriteManager : MonoBehaviour
         {
             uvsChanged = false;
             mesh.uv = UVs;
+            _myFlushCount++;
+            if (_myFlushCount == 1 || _myFlushCount % 300 == 0)
+            {
+                UnityEngine.Debug.LogError($"[MY-FLUSH] go={gameObject.name} myFlush#{_myFlushCount}");
+            }
+            // VERIFY: read mesh.uv back to confirm Unity Mesh actually stored the new values
+            _lateUvFlushCount++;
+            if (_lateUvFlushCount % 60 == 0)
+            {
+                int len = (UVs != null) ? UVs.Length : -1;
+                int lastIdx = len - 4;
+                Vector2[] readback = mesh.uv;   // <-- READ BACK from Mesh
+                int rblen = (readback != null) ? readback.Length : -1;
+                string wroteSample = (lastIdx>=0) ? $"wrote[{lastIdx}]=({UVs[lastIdx].x:F3},{UVs[lastIdx].y:F3})" : "n/a";
+                string readSample = (rblen>=4 && lastIdx>=0 && lastIdx<rblen) ? $"meshUV[{lastIdx}]=({readback[lastIdx].x:F3},{readback[lastIdx].y:F3})" : "n/a";
+                bool match = (rblen==len && lastIdx>=0 && lastIdx<rblen && readback[lastIdx]==UVs[lastIdx]);
+                UnityEngine.Debug.LogError($"[MGR-FLUSH] go={gameObject.name} flushCnt={_lateUvFlushCount} rblen={rblen}/wrote={len} match={match} {wroteSample} {readSample} vCnt={mesh.vertexCount} rendOn={(meshRenderer!=null?meshRenderer.enabled.ToString():"NULL")} matName={(meshRenderer!=null&&meshRenderer.sharedMaterial!=null?meshRenderer.sharedMaterial.name:"NULL")}");
+            }
         }
     }
+    private static int _lateUvFlushCount = 0;
+    private bool _firstLateUpdateLogged = false;
+    private int _myLateUpdateCount = 0;
+    private int _myFlushCount = 0;
+    private static int _meshNullCount = 0;
+    private static int _rebuildCount = 0;
 
     // Source: Ghidra work/06_ghidra/decompiled_full/SpriteManager/DoMirror.c RVA 0x1576D64
     // 1-1: editor-mode mirror of LateUpdate — runs from Editor inspector to refresh preview mesh.

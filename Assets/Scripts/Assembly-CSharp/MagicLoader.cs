@@ -195,14 +195,54 @@ public class MagicLoader : MonoBehaviour
     // Source: Il2CppDumper-stub  TypeDefIndex: 768
     public class MagicFxResourcePool<K> : TResObjectPool<K, MagicFxResource>
     {
-        // Source: Ghidra dump_by_rva → MagicLoader_MagicFxResourcePool_o__UpdateObject.c RVA 0x229BACC
-        // TODO: 50+ line body iterates `resObject.value.magicLoader.fxLoaders[i][j]` (nested List<List<FxLoader>>)
-        // and calls `MagicLoader.Instance.fxPool.Find(...)` + `soundPool.Find(...)` for each loader's resObj.
-        // The MagicFxLoader/FxLoader internals + nested-list traversal are too risky to port without
-        // verifying MagicFxLoader.fxLoaders shape. Keep NIE+RVA per CLAUDE.md §D6.
+        // Source: Ghidra work/06_ghidra/decompiled_rva/MagicLoader_MagicFxResourcePool_o__UpdateObject.c RVA 0x229BACC
+        // 1-1 port. Iterates resObject.value.magicData.fx[i].data[j] and pings fxPool/soundPool with
+        // each fxData's fxName/soundName so the pool LRU clocks refresh.
+        // Calling convention note: Ghidra emits TResObjectPool<...>__Find(timeArg_in_float_reg, this, key, moveTop, methodInfo);
+        //   * float reg arg = fxPool.timeDefault (raw uint32 at offset 0x1c of pool)
+        //   * moveTop arg = 0 (false)
+        // So C# call site uses: pool.Find(key, pool.timeDefault, false).
+        // Field offsets traced from dump.cs:
+        //   resObject @ TResObject<K,MagicFxResource>: value @ 0x18
+        //   MagicFxResource: magicData @ 0x40
+        //   MagicFxData: fx (FxDatas[]) @ 0x20
+        //   FxDatas: data (List<FxData>) @ 0x10
+        //   FxData: fxName @ 0x10, soundName @ 0x18
+        //   MagicLoader: fxPool @ 0x38, soundPool @ 0x50
         protected override void UpdateObject(TResObject<K, MagicFxResource> resObject, float elapsedTime)
         {
-            throw new System.NotImplementedException(); // TODO body RVA 0x229BACC — depends on MagicFxLoader.FxLoaders shape
+            if (resObject == null) throw new System.NullReferenceException();
+            MagicFxResource value = resObject.value;
+            if (value == null) throw new System.NullReferenceException();
+            int i = 0;
+            while (value.magicData != null && value.magicData.fx != null)
+            {
+                if (i >= value.magicData.fx.Length) return;
+                int j = 0;
+                while (true)
+                {
+                    if (value.magicData == null || value.magicData.fx == null)
+                        throw new System.NullReferenceException();
+                    MagicFxData.FxDatas fxDatas = value.magicData.fx[i];
+                    if (fxDatas == null || fxDatas.data == null)
+                        throw new System.NullReferenceException();
+                    if (j >= fxDatas.data.Count) break;
+                    MagicFxData.FxData fxData = fxDatas.data[j];
+                    MagicLoader ml = MagicLoader.Instance;
+                    if (ml == null || fxData == null || ml.fxPool == null)
+                        throw new System.NullReferenceException();
+                    ml.fxPool.Find(fxData.fxName, ml.fxPool.timeDefault, false);
+                    if (MagicLoader.Instance == null || MagicLoader.Instance.soundPool == null)
+                        throw new System.NullReferenceException();
+                    MagicLoader.Instance.soundPool.Find(fxData.soundName, MagicLoader.Instance.soundPool.timeDefault, false);
+                    value = resObject.value;
+                    j++;
+                    if (value == null) throw new System.NullReferenceException();
+                }
+                i++;
+                if (value == null) break;
+            }
+            throw new System.NullReferenceException();
         }
 
         public MagicFxResourcePool(int size_max = -1, float time_default = -1)

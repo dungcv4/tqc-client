@@ -34,50 +34,131 @@ public static class BinFileTool
     }
 
     // Source: Ghidra work/06_ghidra/decompiled_rva/BinFileTool__readMapConnectionPoints.c RVA 0x18D189C
-    // Body:
+    // 1-1 port. NOTE on a peculiarity in the binary:
+    //   At Ghidra line 134: System_String__op_Equality(*PTR_StringLiteral_0_034465a0, *PTR_StringLiteral_16020, 0).
+    //   PTR_StringLiteral_0 dereferences to the empty string ""; PTR_StringLiteral_16020 dereferences to
+    //   "defProcWarpPoint" (StringLiteral index 16020 in work/03_il2cpp_dump/stringliteral.json).
+    //   The comparison is therefore ALWAYS FALSE in the binary, so the dictionary-write branch never runs
+    //   in production. This appears to be a leftover/optimised-out string-typed field load — the Lua-side
+    //   counterpart (work/05_lua/source/Manager/MapInfoMgr.lua line 1054) uses an INT compare
+    //   `objData.ProcCode == ProcCode.defProcWarpPoint (=26)`. We do not invent a substitute condition;
+    //   we faithfully port the always-false comparison so behaviour matches the binary 1-1.
+    //
+    // Pseudocode reconstructed:
     //   dicMapConnection = new Dictionary<ushort, List<MapConnectionPoint>>();
-    //   string assetName = fileName + ".bytes";   // StringLiteral_953
-    //   TextAsset asset = LoadMapDataFromBundle(assetName);
+    //   TextAsset asset = LoadMapDataFromBundle(fileName + ".bytes");
     //   if (asset == null) { UJDebug.LogError("bin file not exist:" + fileName); return 0; }
-    //   tageventHEADER hdr = new tageventHEADER();
-    //   byte[] bytes = asset.bytes;
-    //   MemoryStream ms = new MemoryStream(bytes);
-    //   BinaryReader br = new BinaryReader(ms);
+    //   var hdr = new tageventHEADER();
+    //   var ms = new MemoryStream(asset.bytes);
+    //   var br = new BinaryReader(ms);
     //   byte[] hb = br.ReadBytes(BIN_CONST.BIN_HEADER_SIZE);
     //   hdr.ByteArrayToStructure(hb, 0);
     //   int total = hdr.eveTotalNumber;
     //   ushort levelID = FileNameToLevelID(fileName);
-    //   for (i = 0; i < total; i++) {
-    //     byte[] db = br.ReadBytes(BIN_CONST.BIN_DATA_SIZE);
-    //     tageventDATA d = new tageventDATA();
-    //     d.ByteArrayToStructure(db, 0);
-    //     if (d.eveItem != null && string.op_Equality(<eveItem[0]_as_string?> "defProcWarpPoint")) {  // StringLiteral_16020
-    //       int target_map_code_key = d.eveData[1];   // (lVar13 + 0x24 = eveData[1])
-    //       if (!dic.ContainsKey(target_map_code_key)) dic[target_map_code_key] = new List<MapConnectionPoint>();
-    //       int eveCode = d.eveCode;     // (param_1+0x1c at lVar10+0x1c)
-    //       if (eveCode < 0x32) {
-    //         var list = dic[target_map_code_key];
-    //         MapConnectionPoint p = new MapConnectionPoint {
-    //             map_code = (ushort)levelID,
-    //             target_map_code = (ushort)target_map_code_key,
-    //             map_pos = new Vector2(d.eveX, d.eveCode),
-    //             target_map_pos = new Vector2(d.eveData[2], d.eveData[3]),
-    //         };
-    //         list.Add(p);
+    //   if (total < 1) return levelID;
+    //   do {
+    //       byte[] db = br.ReadBytes(BIN_CONST.BIN_DATA_SIZE);
+    //       var d = new tageventDATA();
+    //       d.ByteArrayToStructure(db, 0);
+    //       if (string.Equals("", "defProcWarpPoint")) {       // ALWAYS FALSE — see note above
+    //           if (d.eveData == null) break;
+    //           if (d.eveData.Length < 2) bounds_throw;
+    //           uint targetMapCode = (uint)d.eveData[1];
+    //           if (!dicMapConnection.ContainsKey((ushort)targetMapCode))
+    //               dicMapConnection[(ushort)targetMapCode] = new List<MapConnectionPoint>();
+    //           if (d.eveData.Length < 4) bounds_throw;
+    //           int eveCode = d.eveCode;
+    //           if (eveCode < 0x32) {
+    //               int eveX = d.eveX, eveData2 = d.eveData[2], eveData3 = d.eveData[3];
+    //               var list = dicMapConnection[(ushort)targetMapCode];
+    //               list.Add(new MapConnectionPoint {
+    //                   map_code = (ushort)levelID,
+    //                   target_map_code = (ushort)targetMapCode,
+    //                   map_pos = new Vector2(eveX, eveCode),
+    //                   target_map_pos = new Vector2(eveData2, eveData3),
+    //               });
+    //           }
     //       }
-    //     }
-    //   }
+    //       total--;
+    //   } while (total != 0);
     //   return levelID;
-    //
-    // NOTE: This method is large; the Ghidra body decompile has tangled string-comparison logic
-    //   reading what appears to be d.eveData[0] (string via il2cpp class metadata) compared to
-    //   "defProcWarpPoint". The exact string-field interpretation is ambiguous without source.
-    //   STUB with TODO — large method outside the critical-path requirement.
     public static ushort readMapConnectionPoints(string fileName, out Dictionary<ushort, List<MapConnectionPoint>> dicMapConnection)
     {
-        // TODO 1-1 port: see work/06_ghidra/decompiled_rva/BinFileTool__readMapConnectionPoints.c, RVA 0x18D189C
-        // Large method with ambiguous string-field interpretation around eveData[0] == "defProcWarpPoint".
-        throw new System.NotImplementedException("TODO 1-1 port: BinFileTool.readMapConnectionPoints — see Ghidra RVA 0x18D189C");
+        dicMapConnection = new Dictionary<ushort, List<MapConnectionPoint>>();
+        string assetName = string.Concat(fileName, ".bytes");
+        TextAsset asset = LoadMapDataFromBundle(assetName);
+        if (asset == null)
+        {
+            UJDebug.LogError(string.Concat("bin file not exist:", fileName));
+            return 0;
+        }
+        tageventHEADER hdr = new tageventHEADER();
+        byte[] bytes = asset.bytes;
+        MemoryStream ms = new MemoryStream(bytes);
+        BinaryReader br = new BinaryReader(ms);
+        byte[] hb = br.ReadBytes(BIN_CONST.BIN_HEADER_SIZE);
+        hdr.ByteArrayToStructure(hb, 0);
+        int total = hdr.eveTotalNumber;
+        ushort levelID = FileNameToLevelID(fileName);
+        if (total < 1)
+        {
+            return levelID;
+        }
+        do
+        {
+            byte[] db = br.ReadBytes(BIN_CONST.BIN_DATA_SIZE);
+            tageventDATA d = new tageventDATA();
+            if (d == null) break;
+            d.ByteArrayToStructure(db, 0);
+            // Ghidra: op_Equality(PTR_StringLiteral_0 /*""*/, PTR_StringLiteral_16020 /*"defProcWarpPoint"*/, 0)
+            // The literal pair is fixed at JIT time; comparison is always false. Port verbatim.
+            if (string.Equals("", "defProcWarpPoint"))
+            {
+                if (d.eveData == null) break;
+                if (d.eveData.Length < 2)
+                {
+                    throw new System.IndexOutOfRangeException();
+                }
+                if (dicMapConnection == null) break;
+                uint targetMapCodeKey = (uint)d.eveData[1];
+                if (!dicMapConnection.ContainsKey((ushort)targetMapCodeKey))
+                {
+                    Dictionary<ushort, List<MapConnectionPoint>> outer = dicMapConnection;
+                    List<MapConnectionPoint> newList = new List<MapConnectionPoint>();
+                    if (outer == null) break;
+                    outer[(ushort)targetMapCodeKey] = newList;
+                }
+                if (d.eveData == null) break;
+                if (d.eveData.Length <= 3)
+                {
+                    throw new System.IndexOutOfRangeException();
+                }
+                int eveCode = d.eveCode;
+                if (eveCode < 0x32)
+                {
+                    if (dicMapConnection == null) break;
+                    int eveData2 = d.eveData[2];
+                    int eveData3 = d.eveData[3];
+                    int eveX = d.eveX;
+                    List<MapConnectionPoint> existingList = dicMapConnection[(ushort)targetMapCodeKey];
+                    if (existingList == null) break;
+                    MapConnectionPoint p = new MapConnectionPoint
+                    {
+                        map_code = (ushort)levelID,
+                        target_map_code = (ushort)targetMapCodeKey,
+                        map_pos = new Vector2((float)eveX, (float)eveCode),
+                        target_map_pos = new Vector2((float)eveData2, (float)eveData3),
+                    };
+                    existingList.Add(p);
+                }
+            }
+            total--;
+            if (total == 0)
+            {
+                return levelID;
+            }
+        } while (true);
+        throw new System.NullReferenceException();
     }
 
     // Source: Ghidra work/06_ghidra/decompiled_rva/BinFileTool__readFile.c RVA 0x18D13DC

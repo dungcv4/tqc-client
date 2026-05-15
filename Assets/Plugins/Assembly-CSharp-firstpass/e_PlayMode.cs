@@ -16,7 +16,14 @@ using UnityEngine.Events;
 using UnityEngine.UI;
 using UnityEngine.Networking;
 
-// Source: Il2CppDumper-stub  TypeDefIndex: 8224
+// Source: dump.cs (work/03_il2cpp_dump/dump.cs) TypeDefIndex: 8224
+// Pure enum — no method bodies to port. Values verified 1-1 against dump.cs.
 public enum e_PlayMode
 {
+    None = -1,
+    Web = 0,
+    Android = 1,
+    iOS = 2,
+    PC = 3,
+    WebGL = 4,
 }

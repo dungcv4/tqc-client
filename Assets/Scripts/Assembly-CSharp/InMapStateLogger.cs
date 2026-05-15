@@ -106,7 +106,37 @@ public static class InMapStateLogger
         if (stateChanged || periodicWhileDown)
         {
             bool overUI = false;
+            string overUIHits = "";
             try { overUI = BaseProcLua.PointIsOverUI(new Vector2(mp.x, mp.y)); } catch { }
+            // Diagnostic: when overUI=true, dump WHICH GameObjects are blocking the raycast (top 5).
+            if (overUI && downStart)
+            {
+                try
+                {
+                    var es = UnityEngine.EventSystems.EventSystem.current;
+                    if (es != null)
+                    {
+                        var ped = new UnityEngine.EventSystems.PointerEventData(es) { position = new Vector2(mp.x, mp.y) };
+                        var hits = new System.Collections.Generic.List<UnityEngine.EventSystems.RaycastResult>();
+                        es.RaycastAll(ped, hits);
+                        var sb = new System.Text.StringBuilder(" overUI_hits=[");
+                        int n = System.Math.Min(hits.Count, 5);
+                        for (int i = 0; i < n; i++)
+                        {
+                            if (i > 0) sb.Append(", ");
+                            var go = hits[i].gameObject;
+                            string path = go.name;
+                            Transform t = go.transform.parent;
+                            int depth = 0;
+                            while (t != null && depth < 4) { path = t.name + "/" + path; t = t.parent; depth++; }
+                            sb.Append(path);
+                        }
+                        sb.Append("]");
+                        overUIHits = sb.ToString();
+                    }
+                }
+                catch { }
+            }
 
             // Probe WndForm_Joystick state via GameObject.Find.
             GameObject joyParent = GameObject.Find("WndForm_Joystick(Clone)");
@@ -173,6 +203,7 @@ public static class InMapStateLogger
                 + " mp=(" + mp.x.ToString("F0") + "," + mp.y.ToString("F0") + ")"
                 + " touchCount=" + touchCnt
                 + " PointIsOverUI=" + overUI
+                + overUIHits
                 + " joy=" + joyState);
 
             _inputLogCooldown = 0;

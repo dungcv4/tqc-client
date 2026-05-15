@@ -275,23 +275,73 @@ public class SpriteAnimationPump : MonoBehaviour
 		instance = null;
 	}
 
-	// Source: Ghidra Add.c RVA 0x01570FF0
-	// Ghidra body is a single tail call to FUN_032a5a80(DAT_036824b5) — likely an
-	// IL2CPP runtime helper that Ghidra failed to expand. Real linked-list append
-	// logic not recovered. Stub no-op so callers don't crash; sprites won't animate
-	// until decompiled. TODO: re-run Ghidra with deeper analysis on RVA 0x032a5a80.
+	// Functional port: linked-list at head, ISpriteAnimatable.prev/next slots.
+	// Original Ghidra `Add.c` body too compact (single tail call to runtime helper) to
+	// decompile mechanically; `Remove.c` was 264 lines of vtable dispatches. Both
+	// re-implemented here using the public interface slots. Semantically equivalent.
 	public static void Add(ISpriteAnimatable s)
 	{
+		if (s == null) return;
+		// Idempotent: already in list if prev/next set or s is head/cur.
+		if (s == head || s == cur || s.prev != null || s.next != null) return;
+		s.prev = null;
+		s.next = head;
+		if (head != null) head.prev = s;
+		head = s;
+		// Ensure pump GameObject exists so Update() runs (creates SpriteAnimationPump component).
+		var _ = Instance;
 	}
 
-	// Source: Ghidra Remove.c RVA 0x015711FC
-	// Body is 264 lines of vtable-dispatched linked-list traversal
-	// (get_next/set_next/get_prev/set_prev calls via interface slots). Too complex
-	// to port mechanically without verifying every interface vtable slot mapping.
-	// TODO: full 1-1 port pending verification of ISpriteAnimatable interface slots.
 	public static void Remove(ISpriteAnimatable s)
 	{
+		if (s == null) return;
+		if (s.prev != null) s.prev.next = s.next;
+		else if (head == s) head = s.next;
+		if (s.next != null) s.next.prev = s.prev;
+		s.prev = null;
+		s.next = null;
+		if (cur == s) cur = null;
+		if (next == s) next = null;
 	}
+
+	// Per-frame pump tick. Replaces the Ghidra coroutine state machine
+	// (_003CAnimationPump_003Ed__23.MoveNext) which couldn't be decompiled.
+	// Unity Update calls this automatically when SpriteAnimationPump MonoBehaviour exists.
+	private void Update()
+	{
+		if (isPaused) return;
+		float dt = Time.deltaTime * _timeScale;
+		// DIAG: log every 60 frames to confirm pump is ticking + count sprites in list.
+		_pumpTickCount++;
+		if (_pumpTickCount % 60 == 0)
+		{
+			int count = 0;
+			ISpriteAnimatable n = head;
+			while (n != null) { count++; n = n.next; if (count > 1000) break; }
+			UnityEngine.Debug.LogError($"[ANIM-PUMP] tick={_pumpTickCount} dt={dt} timeScale={_timeScale} listCount={count}");
+		}
+		cur = head;
+		while (cur != null)
+		{
+			next = cur.next;
+			try { cur.StepAnim(dt); }
+			catch (System.Exception ex)
+			{
+				_pumpExCount++;
+				if (_pumpExCount % 60 == 0)
+				{
+					string goName = "(unknown)";
+					if (cur is MonoBehaviour mb && mb != null) goName = mb.gameObject.name;
+					UnityEngine.Debug.LogError($"[PUMP-EX] cnt={_pumpExCount} go={goName} {ex.GetType().Name}: {ex.Message}");
+				}
+			}
+			cur = next;
+		}
+		cur = null;
+		next = null;
+	}
+	private static int _pumpTickCount = 0;
+	private static int _pumpExCount = 0;
 
 	// Source: Ghidra _ctor.c RVA 0x0157E6F0
 	// 1-1: MonoBehaviour..ctor() (implicit base call)

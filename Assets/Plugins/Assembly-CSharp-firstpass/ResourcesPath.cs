@@ -234,10 +234,28 @@ public class ResourcesPath
         return data.PatchServerList; } }
 
     // RVA: 0x15884D0  Ghidra: work/06_ghidra/decompiled_full/ResourcesPath/get_PatchServerListVersion.c
-    public static string PatchServerListVersion { get { // TODO: confidence:low — pattern mirrors siblings; field PatchServerListVersion not present in
-        // PatchHostData skeleton at expected offset 0x80; assume same conditional swap returning the
-        // 14th string field if it exists. Falling back to NIE per strict rules.
-        throw new System.NotImplementedException(); } }
+    // Body (from Ghidra):
+    //   uVar2 = IsPreviewVersion();
+    //   data = (uVar2 & 1) == 0 ? _patchData (offset 0x28) : _patchDataPreview (offset 0x30);
+    //   if (data == null) NRE;
+    //   return *(data + 0x78) = data.PatchServerListVersion.
+    // Cross-check: PatchHostData.PatchServerListVersion exists at dump.cs line 511980 offset 0x78.
+    public static string PatchServerListVersion { get {
+        PatchHostData data;
+        if (!IsPreviewVersion())
+        {
+            data = _patchData;
+        }
+        else
+        {
+            data = _patchDataPreview;
+        }
+        if (data == null)
+        {
+            throw new System.NullReferenceException();
+        }
+        return data.PatchServerListVersion;
+    } }
 
     // RVA: 0x158855C  Ghidra: work/06_ghidra/decompiled_full/ResourcesPath/get_PatchData.c
     public static PatchHostData PatchData { get { return _patchData; } }

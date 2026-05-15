@@ -1146,10 +1146,17 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 			float endX = (frameInfo.uvs.x + bleedCompensationUVMax.x + fw * brTruncate.x * topClipPct);
 			uvRect = new Rect(uvX, uvY, endX - uvX, fh * brTruncate.y * bottomClipPct);
 		}
+		// DIAG: log every 120 UpdateUVs calls to verify UV propagation
+		_updateUvsDiagCount++;
+		if (_updateUvsDiagCount % 120 == 0)
+		{
+			UnityEngine.Debug.LogError($"[UPDATE-UVS] go={gameObject.name} mesh={(m_spriteMesh==null?"NULL":m_spriteMesh.GetType().Name)} uvRect=({uvRect.x:F4},{uvRect.y:F4},{uvRect.width:F4},{uvRect.height:F4}) frameUVs=({frameInfo.uvs.x:F4},{frameInfo.uvs.y:F4},{frameInfo.uvs.width:F4},{frameInfo.uvs.height:F4}) trunc={truncated} clip={clipped}");
+		}
 		if (m_spriteMesh == null) return;
 		SetMirror();
 		m_spriteMesh.UpdateUVs();
 	}
+	private static int _updateUvsDiagCount = 0;
 
 	// Source: Ghidra SetMirror.c RVA 0x015851B8
 	// 1-1: Get spriteMesh.uvs (virtual vtable+5 on SpriteMesh = get_uvs). If uvs.Length >= 4:
@@ -1167,9 +1174,29 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 	//   Then call spriteMesh.vtable+0xb (= UpdateUVs).
 	public void SetMirror()
 	{
-		if (m_spriteMesh == null) return;
+		// ONE-TIME per-sprite diag: first time this sprite hits SetMirror, log unconditionally
+		if (!_firstSetMirrorLogged)
+		{
+			_firstSetMirrorLogged = true;
+			string meshTypeName = (m_spriteMesh == null) ? "NULL" : m_spriteMesh.GetType().Name;
+			UnityEngine.Debug.LogError($"[FIRST-MIRROR] go={gameObject.name} mesh={meshTypeName} managed={managed}");
+		}
+		_setMirrorDiagCount++;
+		bool meshNull = (m_spriteMesh == null);
+		if (meshNull)
+		{
+			if (_setMirrorDiagCount % 120 == 0)
+				UnityEngine.Debug.LogError($"[SET-MIRROR] go={gameObject.name} ABORT: m_spriteMesh=NULL");
+			return;
+		}
 		Vector2[] uvs = m_spriteMesh.uvs;
-		if (uvs == null || uvs.Length < 4) return;
+		bool uvsBad = (uvs == null || uvs.Length < 4);
+		if (uvsBad)
+		{
+			if (_setMirrorDiagCount % 120 == 0)
+				UnityEngine.Debug.LogError($"[SET-MIRROR] go={gameObject.name} ABORT: uvs={(uvs==null?"NULL":$"len={uvs.Length}")}");
+			return;
+		}
 		float x = uvRect.x;
 		float y = uvRect.y;
 		float xMax = x + uvRect.width;
@@ -1188,8 +1215,14 @@ public abstract class SpriteRoot : MonoBehaviour, IEZLinkedListItem<ISpriteAnima
 			uvs[2] = new Vector2(x,    y);
 			uvs[3] = new Vector2(x,    yMax);
 		}
+		if (_setMirrorDiagCount % 120 == 0)
+		{
+			UnityEngine.Debug.LogError($"[SET-MIRROR] go={gameObject.name} mesh={m_spriteMesh.GetType().Name} mirror={isMirror} uv0=({uvs[0].x:F4},{uvs[0].y:F4}) uv2=({uvs[2].x:F4},{uvs[2].y:F4})");
+		}
 		m_spriteMesh.UpdateUVs();
 	}
+	private static int _setMirrorDiagCount = 0;
+	private bool _firstSetMirrorLogged = false;
 
 	// Source: Ghidra TransformBillboarded.c RVA 0x0158533C — empty body (returns immediately).
 	public void TransformBillboarded(Transform t) { }

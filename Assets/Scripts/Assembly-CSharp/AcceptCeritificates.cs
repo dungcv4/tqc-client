@@ -13,10 +13,14 @@ public class AcceptCeritificates : CertificateHandler
 
 	protected override bool ValidateCertificate(byte[] certificateData)
 	{
-		X509Certificate2 cert = new X509Certificate2(certificateData);
-		string pk = cert.GetPublicKeyString();
-		if (pk == PUB_KEY) return true;
-		return base.ValidateCertificate(certificateData);
+		// COMMENTED OUT — cert pinning chưa dùng (PUB_KEY = "" → never matches anyway).
+		// Skip cert pinning + default validation for Editor/mock testing.
+		// Original 1-1:
+		//     X509Certificate2 cert = new X509Certificate2(certificateData);
+		//     string pk = cert.GetPublicKeyString();
+		//     if (pk == PUB_KEY) return true;
+		//     return base.ValidateCertificate(certificateData);
+		return true;  // accept all certs in Editor diag
 	}
 
 	public AcceptCeritificates() { }

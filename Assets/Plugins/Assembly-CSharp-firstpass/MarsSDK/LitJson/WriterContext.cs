@@ -27,8 +27,10 @@ namespace MarsSDK.LitJson
         public bool ExpectingValue;
         public int Padding;
 
-        // RVA: 0x159A360  Ghidra: work/06_ghidra/decompiled_full/MarsSDK.LitJson.WriterContext/.ctor.c
-        public WriterContext() { throw new System.NotImplementedException(); }
+        // Source: Ghidra work/06_ghidra/decompiled_full/MarsSDK.LitJson.WriterContext/.ctor.c RVA 0x159A360
+        // 1-1: System_Object___ctor(this, 0); return;
+        // (no field initialization — fields default to 0/false per CLR)
+        public WriterContext() { }
 
     }
 }

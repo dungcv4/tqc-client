@@ -653,6 +653,15 @@ public class BaseProcLua : CBaseProc
     // hidden parameter (not present in C#). Hence: cbFunc = null.
     public static bool ConnectToServer(int ProxyID, string ip, int port)
     {
+#if UNITY_EDITOR
+        // EDITOR MOCK: redirect to local mock server (tools/mock_server.py — the working one)
+        // ProxyID 0 = login, ProxyID 1 = map
+        // Old mock ports: LOGIN_PORT=10232, MAP_PORT=10233
+        string origIp = ip; int origPort = port;
+        ip = "127.0.0.1";
+        port = (ProxyID == 0) ? 10232 : 10233;
+        UnityEngine.Debug.Log($"[MOCK] ConnectToServer redirect: ProxyID={ProxyID} {origIp}:{origPort} → {ip}:{port}");
+#endif
         BaseConnect inst = BaseConnect.Instance;
         if (inst != null)
         {

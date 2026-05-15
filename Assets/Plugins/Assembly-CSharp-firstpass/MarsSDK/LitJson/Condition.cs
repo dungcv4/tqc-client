@@ -18,8 +18,14 @@ using UnityEngine.Networking;
 
 namespace MarsSDK.LitJson
 {
-    // Source: Il2CppDumper-stub  TypeDefIndex: 8252
+    // Source: dump.cs (work/03_il2cpp_dump/dump.cs) TypeDefIndex: 8252
+    // Pure enum — no method bodies to port. Values verified 1-1 against dump.cs.
     internal enum Condition
     {
+        InArray = 0,
+        InObject = 1,
+        NotAProperty = 2,
+        Property = 3,
+        Value = 4,
     }
 }

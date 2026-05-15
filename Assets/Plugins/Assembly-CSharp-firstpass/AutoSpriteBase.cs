@@ -338,6 +338,12 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		if (curAnim == null) return false;
 		timeSinceLastFrame += time;
 		framesToAdvance = timeSinceLastFrame / timeBetweenAnimFrames;
+		// DIAG: log every 60 calls per sprite to verify StepAnim is advancing
+		_stepDiagCount++;
+		if (_stepDiagCount % 60 == 0)
+		{
+			UnityEngine.Debug.LogError($"[STEP-DIAG] go={gameObject.name} anim='{curAnim.name}' time={time} tslf={timeSinceLastFrame} tbf={timeBetweenAnimFrames} framesToAdvance={framesToAdvance} curFrame={curAnim.curFrame} totalFrames={(curAnim.frames!=null?curAnim.frames.Length:-1)}");
+		}
 		if (framesToAdvance < 1f)
 		{
 			if (crossfadeFrames)
@@ -396,6 +402,16 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 					}
 				}
 				uvRect = frameInfo.uvs;
+				if (!_firstAdvanceLogged)
+				{
+					_firstAdvanceLogged = true;
+					UnityEngine.Debug.LogError($"[FIRST-ADV] go={gameObject.name} uvRect=({frameInfo.uvs.x:F4},{frameInfo.uvs.y:F4},{frameInfo.uvs.width:F4},{frameInfo.uvs.height:F4}) mesh={(m_spriteMesh==null?"NULL":m_spriteMesh.GetType().Name)}");
+				}
+				_advanceCount++;
+				if (_advanceCount % 240 == 0)
+				{
+					UnityEngine.Debug.LogError($"[ADV-TICK] go={gameObject.name} cnt={_advanceCount}");
+				}
 				SetBleedCompensation(bleedCompensation);
 				if (autoResize || pixelPerfect) CalcSize();
 				else if ((int)anchor == 9) CalcSize();   // TEXTURE_OFFSET — recompute extents
@@ -583,6 +599,9 @@ public abstract class AutoSpriteBase : SpriteBase, ISpriteAggregator, ISpritePac
 		}
 		PlayAnim(animations[index], 0);
 	}
+	private static int _stepDiagCount = 0;
+	private bool _firstAdvanceLogged = false;
+	private static int _advanceCount = 0;
 
 	// Source: Ghidra PlayAnim_4.c RVA 0x0157AB54
 	// 1-1: linear search through animations[i].name (offset 0x30); if match → PlayAnim(found, frame).

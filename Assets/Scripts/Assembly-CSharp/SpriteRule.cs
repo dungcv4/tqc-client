@@ -29,11 +29,41 @@ public class SpriteRule
 
 	public SpriteRule() { }
 
-	// Source: dump.cs — static initializer; allocates empty dicts. Entries populated externally
-	// (e.g., from design tables or by ResMgr).
+	// Source: Ghidra work/06_ghidra/decompiled_full/SpriteRule/.cctor.c (RVA 0x18e69a4)
+	// Populates 9 entries per dict, keys 0-8 = CHAR_ACT STAND..ATTACK3.
+	// STAND/RUN: loopCycle=-1 (infinite), endAction=Do_Nothing. STAND also loopReverse=true.
+	// Other actions: loopCycle=0, endAction=Play_Default_Anim (main dict) or Hide (WLight).
+	// All FPS=10.0.
 	static SpriteRule()
 	{
-		SpriteAnimationSetting = new Dictionary<CHAR_ACT, AnimationSetting>();
-		WLightSpriteAnimationSetting = new Dictionary<CHAR_ACT, AnimationSetting>();
+		var Do_Nothing = UVAnimation.ANIM_END_ACTION.Do_Nothing;
+		var Play_Default_Anim = UVAnimation.ANIM_END_ACTION.Play_Default_Anim;
+		var Hide = UVAnimation.ANIM_END_ACTION.Hide;
+
+		SpriteAnimationSetting = new Dictionary<CHAR_ACT, AnimationSetting>
+		{
+			{ (CHAR_ACT)0, new AnimationSetting(0, 10f, -1, true,  Do_Nothing) },         // STAND
+			{ (CHAR_ACT)1, new AnimationSetting(1, 10f, -1, false, Do_Nothing) },         // RUN
+			{ (CHAR_ACT)2, new AnimationSetting(2, 10f,  0, false, Play_Default_Anim) },  // ATTACK
+			{ (CHAR_ACT)3, new AnimationSetting(3, 10f,  0, false, Play_Default_Anim) },  // DAMAGE
+			{ (CHAR_ACT)4, new AnimationSetting(4, 10f,  0, false, Do_Nothing) },         // DEAD
+			{ (CHAR_ACT)5, new AnimationSetting(5, 10f,  0, false, Play_Default_Anim) },  // SKILL1
+			{ (CHAR_ACT)6, new AnimationSetting(6, 10f,  0, false, Play_Default_Anim) },  // SKILL2
+			{ (CHAR_ACT)7, new AnimationSetting(7, 10f,  0, false, Play_Default_Anim) },  // ATTACK2
+			{ (CHAR_ACT)8, new AnimationSetting(8, 10f,  0, false, Play_Default_Anim) },  // ATTACK3
+		};
+
+		WLightSpriteAnimationSetting = new Dictionary<CHAR_ACT, AnimationSetting>
+		{
+			{ (CHAR_ACT)0, new AnimationSetting(0, 10f, -1, true,  Do_Nothing) },
+			{ (CHAR_ACT)1, new AnimationSetting(1, 10f, -1, false, Do_Nothing) },
+			{ (CHAR_ACT)2, new AnimationSetting(2, 10f,  0, false, Hide) },
+			{ (CHAR_ACT)3, new AnimationSetting(3, 10f,  0, false, Hide) },
+			{ (CHAR_ACT)4, new AnimationSetting(4, 10f,  0, false, Do_Nothing) },
+			{ (CHAR_ACT)5, new AnimationSetting(5, 10f,  0, false, Hide) },
+			{ (CHAR_ACT)6, new AnimationSetting(6, 10f,  0, false, Hide) },
+			{ (CHAR_ACT)7, new AnimationSetting(7, 10f,  0, false, Hide) },
+			{ (CHAR_ACT)8, new AnimationSetting(8, 10f,  0, false, Hide) },
+		};
 	}
 }
