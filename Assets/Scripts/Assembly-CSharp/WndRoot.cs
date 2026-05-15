@@ -137,17 +137,48 @@ public class WndRoot : MonoBehaviour
     private static void EnsureRoot()
     {
         if (s_root != null) return;
-        s_root = new GameObject("WndRootCanvas");
+
+        // Reconstruction of the original scene "GUI_Root" hierarchy that the
+        // 1-1-ported code expects (the real APK ships it as a scene prefab; the
+        // AssetRipper pipeline did not recover it, so we build it here with the
+        // SAME names/structure so the ported logic runs UNMODIFIED):
+        //   * GameObject "GUI_Root"  → Main.SetupScreenSize does
+        //       GameObject.Find("GUI_Root").GetComponentsInChildren<Camera>()[0]
+        //         .orthographicSize = iScreenHeight/2   (this fixes UI size 1-1)
+        //   * child "UICamera" (orthographic Camera) → WndRoot.InitGUI/Start do
+        //       s_root.transform.Find("UICamera") → s_camera; near=-1/far=200;
+        //       WndRoot.SetupScreenSize sets s_camera.rect = Main.rScreenRect
+        //   * child "UI_eff_point_3" → InitGUI's `Find("UI_eff_point_3")` gate
+        //   * Canvas = ScreenSpaceCamera through UICamera (NOT Overlay) so the
+        //     orthographic size + camera.rect actually drive the UI — exactly
+        //     how WndForm.Create wires every form canvas (worldCamera =
+        //     WndRoot.uiCamera, overrideSorting=true).
+        // No invented numbers: orthographicSize comes from Main.SetupScreenSize,
+        // rect from WndRoot.SetupScreenSize (both ported 1-1 from Ghidra).
+        s_root = new GameObject("GUI_Root");
         UnityEngine.Object.DontDestroyOnLoad(s_root);
+
+        var camGO = new GameObject("UICamera");
+        camGO.transform.SetParent(s_root.transform, false);
+        var uiCam = camGO.AddComponent<Camera>();
+        uiCam.orthographic = true;                 // size driven by orthographicSize (Main.SetupScreenSize)
+        uiCam.clearFlags = CameraClearFlags.Depth; // render UI over the 3-D scene
+        uiCam.depth = 10f;                          // after the game/main camera
+        uiCam.nearClipPlane = -1f;                 // InitGUI also enforces these
+        uiCam.farClipPlane = 200f;
+        s_camera = uiCam;
+
+        var effGO = new GameObject("UI_eff_point_3");
+        effGO.transform.SetParent(s_root.transform, false);
+        s_Click_Eff3 = effGO;
+
         var canvas = s_root.AddComponent<Canvas>();
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.renderMode = RenderMode.ScreenSpaceCamera;
+        canvas.worldCamera = uiCam;
+        canvas.planeDistance = 100f;               // within [near,far]; ortho → no size effect
+        // Default CanvasScaler (ConstantPixelSize). The original sets NO scaler
+        // config in InitGUI; WndRoot.SetupScreenSize (1-1) sets scaleFactor.
         var scaler = s_root.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        // Original APK design reference = 1280x720 (verified by spMaskLoading 1280x720
-        // size in WndForm_LoadingScreen prefab — the design's "1:1 viewport" mask).
-        scaler.referenceResolution = new Vector2(1280, 720);
-        // match=0.5 = balanced: UI scales by avg of width+height ratios → fills both dims on any aspect.
-        scaler.matchWidthOrHeight = 0.5f;
         s_rootCanvasScaler = scaler;
         s_root.AddComponent<GraphicRaycaster>();
         s_rootRectTrans = s_root.GetComponent<RectTransform>();
@@ -183,7 +214,40 @@ public class WndRoot : MonoBehaviour
             s_proxyWndforms[i] = p;
         }
     }
-    public static void Update(float dTime) { }
+    /* RVA 0x01a0a9e4 — WndRoot.Update(float dTime)
+     * Source: Ghidra work/06_ghidra/decompiled_full/WndRoot/Update.c
+     * (was an empty `{ }` stub — chế cháo. This is the per-frame driver: it
+     *  ticks every ProxyWndForm, and ProxyWndForm.Update ends by calling
+     *  UpdateOrder → WndForm.UpdateOrder which assigns Canvas.sortingOrder.
+     *  With the stub, NO proxy ticked → NO ordering pass ran → every pop-up
+     *  kept its default sortingOrder and rendered BEHIND the main HUD.)
+     *  Called each frame from Lua via WndRootWrap.Update (WndRootWrap.cs:61).
+     *
+     * 1-1: walk s_proxyWndforms; per element call ProxyWndForm.Update(dTime);
+     *   index >= Length → return; array/element null → NRE (FUN_015cb8fc);
+     *   il2cpp array-bounds failure → IndexOutOfRange (FUN_015cb904).
+     *   (Ghidra's repeated array re-loads are the il2cpp static-cctor guard
+     *    re-reads — implicit in C#; the observable loop is preserved 1-1.)
+     */
+    public static void Update(float dTime)
+    {
+        int i = 0;
+        while (true)
+        {
+            var arr = s_proxyWndforms;
+            if (arr == null) goto LAB_NRE;          // lVar3 == 0 → break → NRE
+            if (arr.Length <= i) return;            // signed: index past end → return
+            if ((uint)arr.Length <= (uint)i) goto LAB_OOB;
+            var p = arr[i];
+            if (p == null) goto LAB_NRE;            // lVar2 == 0 → break → NRE
+            p.Update(dTime);
+            i = i + 1;
+        }
+    LAB_OOB:
+        throw new System.IndexOutOfRangeException();
+    LAB_NRE:
+        throw new System.NullReferenceException();
+    }
 
     // Source: Ghidra work/06_ghidra/decompiled_full/WndRoot/Awake.c RVA 0x01a0acc8
     // 1-1:
@@ -311,7 +375,45 @@ public class WndRoot : MonoBehaviour
     public static void Lunch() { }
     public static void Destroy() { }
     public static CanvasScaler GetCanvasScaler() { return default(CanvasScaler); }
-    private static void SetupScreenSize() { }
+    /* RVA 0x01a0b124 — WndRoot.SetupScreenSize()
+     * Source: Ghidra work/06_ghidra/decompiled_full/WndRoot/SetupScreenSize.c
+     * (was an empty `{ }` stub — chế cháo; the real screen-fit logic lived here).
+     *
+     * 1-1 map (offsets from dump.cs):
+     *   WndRoot.s_root@0x0, .s_camera@0x10, .s_rootCanvasScaler@0x48
+     *   Main.fAspect@0x4C, .fTargetAspectMin@0x58, .rScreenRect@0x70 (Rect),
+     *        .bScreenRectReady@0x80
+     *   CanvasScaler field@0x38 = scaleFactor (Unity engine type → public API)
+     *   DAT @ VA 0x81c22c = 0.01f  (bytes 0a d7 23 3c — binary-verified, capstone:
+     *     adrp x8,#0x81c000 ; ldr s2,[x8,#0x22c] ; fadd ; fcmp)
+     *   0x3f800000 = 1.0f. FUN_015cb8fc = NRE thrower.
+     */
+    private static void SetupScreenSize()
+    {
+        if (s_root == null) goto LAB_NRE;
+        // PTR_DAT_0346aba0 = typeof(CanvasScaler) → s_rootCanvasScaler@0x48
+        s_rootCanvasScaler = s_root.GetComponent<CanvasScaler>();
+        if (s_rootCanvasScaler != null)                       // op_Inequality
+        {
+            float fAspect = Main.fAspect;                     // Main@0x4C
+            if (0f < fAspect)
+            {
+                if (Main.fTargetAspectMin + 0.01f < fAspect)  // @0x58 + DAT(0.01) < @0x4C
+                {
+                    if (s_rootCanvasScaler == null) goto LAB_NRE;
+                    s_rootCanvasScaler.scaleFactor = 1f;      // *(scaler+0x38)=0x3f800000
+                }
+            }
+        }
+        if (!Main.bScreenRectReady) return;                   // Main@0x80 == false → return
+        if (s_camera != null)                                 // WndRoot.s_camera@0x10
+        {
+            s_camera.rect = Main.rScreenRect;                 // set_rect(@0x70,@0x74,@0x78,@0x7c)
+            return;
+        }
+    LAB_NRE:
+        throw new System.NullReferenceException();
+    }
 
     public enum ELayer
     {

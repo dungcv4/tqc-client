@@ -24,11 +24,15 @@ namespace SONETWORK
         public ushort m_pcCompressSize;
         public const int SIZE = 6;
         public const int MAX_SENDDATA_LEN = 64994;
-        // PTR_DAT_03465ff0 in Ghidra: 10-byte CRYPT_TABLE in IL2CPP metadata.
-        // .cctor (RVA 0x1974904) initializes from il2cpp metadata blob — body stays NIE,
-        // so default-init the field to a 10-byte zero array.  Actual XOR table values
-        // will be patched by the type's static ctor when re-decompiled.
-        private static byte[] CRYPT_TABLE = new byte[10];
+        // CRYPT_TABLE — QUYẾT ĐỊNH CHỦ ĐỊNH (user 2026-05-15): GIỮ 10-byte ZERO
+        // CỐ ĐỊNH cả CLIENT (đây) lẫn SERVER (server/src/net/WireCodec.cpp:19).
+        // Lý do: bảng 10-byte không lift được bằng static analysis (.cctor RVA
+        // 0x1974904 init từ il2cpp metadata blob PTR_DAT_03465ff0, Ghidra không
+        // ra .c). Vì PORT client↔SERVER mình tự dựng, CHỌN XOR no-op nhất quán
+        // 2 phía = đúng & gọn (KHÔNG phải hack tạm). Cấm "patch giá trị thật"
+        // 1 phía → sẽ desync. Nếu sau này cần khớp APK gốc: phải lift bảng +
+        // sửa ĐỒNG THỜI cả 2 file. (Self-test P0.5 roundtrip xác nhận nhất quán.)
+        private static byte[] CRYPT_TABLE = new byte[10];   // 10× 0x00 — chủ định
         private static byte[] HEADER_TEMP = new byte[6];
 
         // RVA: 0x1974614  Ghidra: work/06_ghidra/decompiled_full/SONETWORK.proto_COMM/readFromByteArray.c

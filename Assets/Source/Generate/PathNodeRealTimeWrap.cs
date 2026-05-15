@@ -7,24 +7,25 @@ public class PathNodeRealTimeWrap
 	public static void Register(LuaState L)
 	{
 		L.BeginClass(typeof(PathNodeRealTime), typeof(System.Object));
-		L.RegFunction("get_parent", get_parent);
-		L.RegFunction("set_parent", set_parent);
-		L.RegFunction("get_invalidConNum", get_invalidConNum);
-		L.RegFunction("set_invalidConNum", set_invalidConNum);
-		L.RegFunction("get_Invalid", get_Invalid);
-		L.RegFunction("set_Invalid", set_Invalid);
-		L.RegFunction("get_Connections", get_Connections);
-		L.RegFunction("get_Position", get_Position);
-		L.RegFunction("set_Position", set_Position);
+		// Source: dump.cs TypeDefIndex 38 — parent/invalidConNum/Invalid/Position/gn
+		// are C# PROPERTIES ({get;set;}); Connections/fn are get-only ({get;}).
+		// tolua# emits RegVar for properties so Lua sees `obj.Position` etc.
+		// Prior port mis-registered them as RegFunction → Lua `p.Position`
+		// threw "field or property Position does not exist" (MapInfoMgr:2431
+		// OnFindAStarPathResult, minimap click-to-move). Methods stay RegFunction.
 		L.RegFunction("DistanceTo", DistanceTo);
-		L.RegFunction("get_gn", get_gn);
-		L.RegFunction("set_gn", set_gn);
-		L.RegFunction("get_fn", get_fn);
 		L.RegFunction("sethn", sethn);
 		L.RegFunction("getClientPos", getClientPos);
 		L.RegFunction("getServerPos", getServerPos);
 		L.RegFunction("New", _CreatePathNodeRealTime);
 		L.RegFunction("__tostring", ToLua.op_ToString);
+		L.RegVar("parent", get_parent, set_parent);
+		L.RegVar("invalidConNum", get_invalidConNum, set_invalidConNum);
+		L.RegVar("Invalid", get_Invalid, set_Invalid);
+		L.RegVar("Connections", get_Connections, null);
+		L.RegVar("Position", get_Position, set_Position);
+		L.RegVar("gn", get_gn, set_gn);
+		L.RegVar("fn", get_fn, null);
 		L.RegVar("connections", get_connections, set_connections);
 		L.RegVar("_invalidConNum", get__invalidConNum, set__invalidConNum);
 		L.EndClass();

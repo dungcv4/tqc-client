@@ -392,14 +392,181 @@ public class WndForm : IWndForm
         Debug.Log("[WndForm.AfterCreate] after CheckWaitCreateSubWnd eID=" + _wID + " curAlpha=" + _curAlpha + " flagDone=" + ((_wFlag & FLAG_DONE) != 0) + " CG.alpha=" + cgAfter);
     }
 
-    /* RVA 0x01a0641c — UpdateOrder(ref int depth):
-     *   Not in current Ghidra dump for instance method; same body as static below
-     *   (walks _subNodes / _popupNodes linked lists).
+    /* RVA 0x01a0641c — UpdateOrder(ref int depth)  [instance, Slot 5]
+     * Source: Ghidra work/06_ghidra/decompiled_rva/WndForm__UpdateOrder_instance.c
+     * (re-decompiled 2026-05-15 via analyzeHeadless; the earlier "not in Ghidra
+     *  dump → same as static" comment was WRONG — that guess dropped ALL canvas
+     *  ordering, so every WndForm kept its default sortingOrder and pop-ups
+     *  rendered BEHIND the main HUD. This is the real 1-1 body.)
+     *
+     * Type tokens resolved from work/03_il2cpp_dump/script.json:
+     *   GetComponentsInChildren<WndParticle>  (ScriptMetadataMethod 54789736)
+     *   GameObject.GetComponent<Canvas>       (ScriptMetadataMethod 54805224)
+     *   (Canvas token independently confirmed by WndFormNode.cs:35.)
+     *
+     * Field offsets (dump.cs): WndForm._node@0x18, ._subNodes@0x28,
+     *   ._popupNodes@0x30; WndFormNode._canvas@0x10, ._subCanvases@0x58;
+     *   WndParticle.iStartLayer@0x20, .iMaxLayer@0x24.
+     * Ghidra FUN_015cb8fc (LAB_01b06818) = NRE thrower; FUN_015cb904
+     *   (LAB_01b0681c) = array-bounds thrower.
      */
     public void UpdateOrder(ref int depth)
     {
-        UpdateOrder(_subNodes, ref depth);
-        UpdateOrder(_popupNodes, ref depth);
+        var node = _node;                                   // this+0x18
+        if (node == null) goto LAB_NRE;
+
+        // Pass 1 — clear iStartLayer on every WndParticle that is a direct child
+        // of node._canvas (i.e. NOT under its own nested Canvas).
+        if (node._canvas != null)                           // op_Inequality
+        {
+            if (_node == null) goto LAB_NRE;
+            var cv = _node._canvas;
+            if (cv == null) goto LAB_NRE;
+            WndParticle[] parts = cv.GetComponentsInChildren<WndParticle>(true);
+            if (parts == null) goto LAB_NRE;
+            int len = parts.Length;
+            if (len != 0 && len > 0)
+            {
+                int i = 0;
+                do
+                {
+                    if ((uint)len <= (uint)i) goto LAB_OOB;
+                    var p = parts[i];
+                    if (p == null) goto LAB_NRE;
+                    var go = p.gameObject;
+                    if (go == null) goto LAB_NRE;
+                    var cnv = go.GetComponent<Canvas>();
+                    if (cnv == null)                        // op_Equality(null)
+                    {
+                        if ((uint)parts.Length <= (uint)i) goto LAB_OOB;
+                        var p2 = parts[i];
+                        if (p2 == null) goto LAB_NRE;
+                        p2.ResetStartOrder(0);
+                    }
+                    len = parts.Length;
+                    i++;
+                } while (i < parts.Length);
+            }
+        }
+
+        if (_node == null) goto LAB_NRE;
+        {
+            var n = _node;
+            Canvas[] subCanvases = n._subCanvases;          // node+0x58
+            if (subCanvases == null)
+            {
+                if (n._canvas != null)                      // node+0x10
+                {
+                    n._canvas.sortingOrder = depth;
+                    depth = depth + 1;
+                    if (_node == null) goto LAB_NRE;
+                    goto LAB_canvasParticles;               // LAB_01b066d8
+                }
+                goto LAB_NRE;
+            }
+            else
+            {
+                int idx = 0;
+                while (true)
+                {
+                    if (subCanvases.Length <= idx) goto LAB_canvasParticles; // → LAB_01b066d8
+                    if ((uint)subCanvases.Length <= (uint)idx) goto LAB_OOB;
+                    var sc = subCanvases[idx];
+                    if (sc == null) goto LAB_NRE;
+                    sc.overrideSorting = true;
+                    if (_node == null) goto LAB_NRE;
+                    subCanvases = _node._subCanvases;
+                    if (subCanvases == null) goto LAB_NRE;
+                    if ((uint)subCanvases.Length <= (uint)idx) goto LAB_OOB;
+                    var sc2 = subCanvases[idx];
+                    if (sc2 == null) goto LAB_NRE;
+                    sc2.sortingOrder = depth;
+                    depth = depth + 1;
+                    if (_node == null) goto LAB_NRE;
+                    subCanvases = _node._subCanvases;
+                    if (subCanvases == null) goto LAB_NRE;
+                    if ((uint)subCanvases.Length <= (uint)idx) goto LAB_OOB;
+                    var sc3 = subCanvases[idx];
+                    if (sc3 == null) goto LAB_NRE;
+                    WndParticle[] sp = sc3.GetComponentsInChildren<WndParticle>(true);
+                    if (sp == null) goto LAB_NRE;
+                    int spl = sp.Length;
+                    if (spl != 0 && spl > 0)
+                    {
+                        int k = 0;
+                        do
+                        {
+                            if ((uint)spl <= (uint)k) goto LAB_OOB;
+                            var p = sp[k];
+                            if (p == null) goto LAB_NRE;
+                            p.ResetStartOrder(depth);
+                            spl = sp.Length;
+                            if ((uint)spl <= (uint)k) goto LAB_OOB;
+                            var p2 = sp[k];
+                            if (p2 == null) goto LAB_NRE;
+                            k++;
+                            depth = p2.iMaxLayer + depth;
+                        } while (k < spl);
+                    }
+                    if (_node == null) goto LAB_NRE;
+                    subCanvases = _node._subCanvases;
+                    idx = idx + 1;
+                    if (subCanvases == null) goto LAB_NRE;
+                }
+            }
+        }
+
+    LAB_canvasParticles: // LAB_01b066d8 — order WndParticles directly on node._canvas
+        {
+            if (_node == null) goto LAB_NRE;
+            if (_node._canvas != null)                      // op_Inequality
+            {
+                if (_node == null) goto LAB_NRE;
+                var cv = _node._canvas;
+                if (cv == null) goto LAB_NRE;
+                WndParticle[] parts = cv.GetComponentsInChildren<WndParticle>(true);
+                if (parts == null) goto LAB_NRE;
+                int len = parts.Length;
+                if (len != 0 && len > 0)
+                {
+                    int j = 0;
+                    do
+                    {
+                        if ((uint)len <= (uint)j) goto LAB_OOB;
+                        var p = parts[j];
+                        if (p == null) goto LAB_NRE;
+                        var go = p.gameObject;
+                        if (go == null) goto LAB_NRE;
+                        var cnv = go.GetComponent<Canvas>();
+                        len = parts.Length;
+                        if (cnv == null)                    // op_Equality(null)
+                        {
+                            if ((uint)parts.Length <= (uint)j) goto LAB_OOB;
+                            var p2 = parts[j];
+                            if (p2 == null) goto LAB_NRE;
+                            if (p2.iStartLayer == 0)
+                            {
+                                p2.ResetStartOrder(depth);
+                                len = parts.Length;
+                                if ((uint)parts.Length <= (uint)j) goto LAB_OOB;
+                                var p3 = parts[j];
+                                if (p3 == null) goto LAB_NRE;
+                                depth = p3.iMaxLayer + depth;
+                            }
+                        }
+                        j++;
+                    } while (j < len);
+                }
+            }
+            UpdateOrder(_subNodes, ref depth);              // this+0x28 (static overload)
+            UpdateOrder(_popupNodes, ref depth);            // this+0x30
+            return;
+        }
+
+    LAB_OOB:
+        throw new IndexOutOfRangeException();
+    LAB_NRE:
+        throw new NullReferenceException();
     }
 
     /* RVA 0x01a06820 — static UpdateOrder(WndFormNodeLinkList linkList, ref int depth):
