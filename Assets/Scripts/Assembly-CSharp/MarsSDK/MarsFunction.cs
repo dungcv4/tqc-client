@@ -38,53 +38,82 @@ namespace MarsSDK
 		public MarsFunction()
 		{ }
 
+		// Source: Ghidra decompiled/MarsSDK.MarsFunction/*.c — these are thin facades that
+		// delegate 1-1 to MarsSDK.LoginMgr (already ported 1-1). RVAs in comments.
+
+		// RVA 0x199AA3C → LoginMgr.ClearMarsInfoForLogin
 		public static void ClearInfoForLogin()
-		{ }
+		{ LoginMgr.ClearMarsInfoForLogin(); }
 
+		// RVA 0x199AA88 → LoginMgr.GetDeviceID
 		public static string GetDeviceId()
-		{ return default; }
+		{ return LoginMgr.GetDeviceID(); }
 
+		// RVA 0x199AAD4 → LoginMgr.GetPlayerID
 		public static string GetPlayerId()
-		{ return default; }
+		{ return LoginMgr.GetPlayerID(); }
 
+		// RVA 0x199AB20 → LoginMgr.GetBindPlatformList
 		public static JsonData GetBindPlatformList()
-		{ return default; }
+		{ return LoginMgr.GetBindPlatformList(); }
 
+		// RVA 0x199AB6C → LoginMgr.IsBindAnyPlatform
 		public static bool IsBindAnyPlatform()
-		{ return default; }
+		{ return LoginMgr.IsBindAnyPlatform(); }
 
+		// RVA 0x199ABB8 → LoginMgr.GetOneClickPassword
 		public static string GetPassword()
-		{ return default; }
+		{ return LoginMgr.GetOneClickPassword(); }
 
+		// RVA 0x199AC04 → LoginMgr.GetServiceURL
 		public static string GetServerUrl()
-		{ return default; }
+		{ return LoginMgr.GetServiceURL(); }
 
+		// RVA 0x199AC50 → LoginMgr.GetLoginSession
 		public static string GetLoginSession()
-		{ return default; }
+		{ return LoginMgr.GetLoginSession(); }
 
+		// RVA 0x199AC9C → LoginMgr.GetPassKey
 		public static string GetLoginPasskey()
-		{ return default; }
+		{ return LoginMgr.GetPassKey(); }
 
+		// RVA 0x199ACE8 — 1-1: new JsonData(); jd.Add(GetLoginPasskey()); return jd;
 		public static JsonData GetJsonLoginPasskey()
-		{ return default; }
+		{
+			JsonData jd = new JsonData();
+			jd.Add(GetLoginPasskey());
+			return jd;
+		}
 
+		// RVA 0x199AD7C → LoginMgr.LoginByOneClick
 		public static void LoginByOneClick()
-		{ }
+		{ LoginMgr.LoginByOneClick(); }
 
+		// RVA 0x199ADC8 → LoginMgr.LoginByOneClickV2
 		public static void LoginByOneClickV2()
-		{ }
+		{ LoginMgr.LoginByOneClickV2(); }
 
+		// → LoginMgr.LoginByHashAccountId
 		public static void LoginByHashAccountId()
-		{ }
+		{ LoginMgr.LoginByHashAccountId(); }
 
+		// RVA 0x199AE60 — 1-1: !IsNullOrEmpty(GetLoginPasskey()) && !IsNullOrEmpty(GetLoginSession())
 		public static bool IsAlreadyLogin()
-		{ return default; }
+		{
+			if (string.IsNullOrEmpty(GetLoginPasskey()))
+			{
+				return false;
+			}
+			return !string.IsNullOrEmpty(GetLoginSession());
+		}
 
+		// RVA 0x199AEE8 → LoginMgr.HasInfoForLogin
 		public static bool HasInfoForLogin()
-		{ return default; }
+		{ return LoginMgr.HasInfoForLogin(); }
 
+		// → LoginMgr.IsNewAccount
 		public static bool IsNewAccount()
-		{ return default; }
+		{ return LoginMgr.IsNewAccount(); }
 
 		public static bool LoginByPlayerIDWithPassword(string playerid, string password)
 		{ return default; }
