@@ -124,7 +124,22 @@ public class WndRoot : MonoBehaviour
             if (s_maskObj != null) s_maskObj.SetActive(value);
         }
     }
-    public static Vector2 resolution { get { return new Vector2(Screen.width, Screen.height); } }
+    // Source: Ghidra work/06_ghidra/decompiled_full/WndRoot/get_resolution.c RVA 0x01A0B8F8 — 1-1.
+    // Previous port returned ONLY the rectTrans==null fallback (Screen.width×height) — chế cháo;
+    // that broke the click-effect position (ProcessBase:130 anchoredPosition = viewPoint*resolution
+    // expects the UI-root rect size in canvas units, not raw screen pixels).
+    public static Vector2 resolution
+    {
+        get
+        {
+            RectTransform rt = rectTrans;                 // WndRoot.get_rectTrans() → s_rootRectTrans
+            if (rt != null)                                // op_Equality(rectTrans,0)==0
+            {
+                return WndFormExtensions.GetSize(rt);      // primary: rectTrans.rect.size
+            }
+            return new Vector2(Screen.width, Screen.height); // fallback (rectTrans == null)
+        }
+    }
 
     /* RVA 0x01a08654 — GetProxyWndForm(layer) returns s_proxyWndforms[(int)layer] (1-1 Ghidra, no lazy init). */
     public static ProxyWndForm GetProxyWndForm(ELayer layer)
